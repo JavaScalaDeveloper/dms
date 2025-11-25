@@ -1,0 +1,114 @@
+.header {
+  background: linear-gradient(90deg, #1890ff, #0050b3) !important;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.logo {
+  color: white;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.site-layout-background {
+  background: #fff;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.statistic-card {
+  text-align: center;
+  padding: 20px;
+  border-radius: 4px;
+  background: #fafafa;
+  transition: all 0.3s;
+}
+
+.statistic-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.statistic-number {
+  font-size: 24px;
+  font-weight: bold;
+  color: #1890ff;
+}
+
+.statistic-label {
+  font-size: 14px;
+  color: #666;
+}
+
+/* 页面过渡效果 */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+.page-transition-exit {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.page-transition-exit-active {
+  opacity: 0;
+  transform: translateX(-30px);
+  transition: opacity 300ms, transform 300ms;
+}
+
+/* 表格样式优化 */
+.ant-table-thead > tr > th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+/* 菜单样式优化 */
+.ant-menu-inline {
+  border-right: none !important;
+}
+
+.ant-menu-item-selected {
+  background-color: #e6f7ff !important;
+}
+
+/* 卡片样式优化 */
+.ant-card {
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s;
+}
+
+.ant-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 按钮样式优化 */
+.ant-btn-primary {
+  background: linear-gradient(90deg, #1890ff, #0050b3);
+  border-color: #1890ff;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .header {
+    padding: 0 12px;
+  }
+  
+  .logo {
+    font-size: 16px;
+  }
+}
