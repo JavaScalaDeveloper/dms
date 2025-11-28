@@ -8,6 +8,11 @@ const API_CONFIG = {
     INSTANCES: '/mysql/instances',
     DATABASES: '/mysql/databases',
     TABLES: '/mysql/tables'
+  },
+
+  // 结构设计相关API
+  SCHEMA_ENDPOINTS: {
+    WORK_ORDERS: '/schema/work-orders'
   }
 };
 

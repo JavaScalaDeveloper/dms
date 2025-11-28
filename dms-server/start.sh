@@ -50,10 +50,27 @@ fi
 echo -e "${GREEN}✓ 项目编译完成${NC}"
 
 echo
+echo -e "${YELLOW}>>> 检查并释放9000端口...${NC}"
+
+# 查找占用9000端口的进程并尝试结束（兼容macOS和多数Linux）
+PID_9000=$(lsof -ti:9000 2>/dev/null || echo "")
+if [ -n "$PID_9000" ]; then
+    echo -e "${YELLOW}发现运行在9000端口的进程: $PID_9000，正在结束...${NC}"
+    kill $PID_9000 2>/dev/null || kill -9 $PID_9000 2>/dev/null
+    sleep 1
+    if lsof -ti:9000 >/dev/null 2>&1; then
+        echo -e "${RED}警告: 无法成功释放9000端口，请手动检查进程${NC}"
+    else
+        echo -e "${GREEN}✓ 9000端口已成功释放${NC}"
+    fi
+else
+    echo -e "${GREEN}9000端口当前空闲${NC}"
+fi
+
+echo
 echo -e "${YELLOW}>>> 启动Spring Boot应用...${NC}"
-echo "访问地址: http://localhost:8084"
-echo "API基础路径: http://localhost:8084/api"
-echo "H2控制台: http://localhost:8084/h2-console"
+echo "访问地址: http://localhost:9000"
+echo "API基础路径: http://localhost:9000/api"
 echo
 echo "按 Ctrl+C 停止服务"
 echo -e "${GREEN}===========================================${NC}"
