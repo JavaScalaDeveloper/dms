@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Tabs, 
   Table, 
@@ -10,7 +10,8 @@ import {
   message, 
   Card,
   Space,
-  Popconfirm
+  Popconfirm,
+  Select
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -19,30 +20,90 @@ import {
   DatabaseOutlined,
   TableOutlined
 } from '@ant-design/icons';
+import { mysqlInstanceApi, mysqlDatabaseApi, mysqlTableApi } from '../../services/mysqlApi';
+
+const { Option } = Select;
 
 const MysqlManagement = () => {
   const [activeTab, setActiveTab] = useState('instances');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
   const [form] = Form.useForm();
+  
+  // 实例数据
+  const [instances, setInstances] = useState([]);
+  const [loadingInstances, setLoadingInstances] = useState(false);
+  
+  // 数据库数据
+  const [databases, setDatabases] = useState([]);
+  const [loadingDatabases, setLoadingDatabases] = useState(false);
+  
+  // 表数据
+  const [tables, setTables] = useState([]);
+  const [loadingTables, setLoadingTables] = useState(false);
 
-  // Mock data for instances
-  const [instances, setInstances] = useState([
-    { id: 1, name: '生产MySQL实例1', host: '192.168.1.10', port: 3306, username: 'admin', status: 'running' },
-    { id: 2, name: '测试MySQL实例2', host: '192.168.1.11', port: 3306, username: 'test', status: 'stopped' }
-  ]);
+  // 获取实例数据
+  const fetchInstances = async () => {
+    setLoadingInstances(true);
+    try {
+      const response = await mysqlInstanceApi.getInstances();
+      setInstances(response.data || []);
+    } catch (error) {
+      message.error('获取实例数据失败: ' + error.message);
+    } finally {
+      setLoadingInstances(false);
+    }
+  };
 
-  // Mock data for databases
-  const [databases, setDatabases] = useState([
-    { id: 1, name: 'production_db', instance: '生产MySQL实例1', size: '10GB', tables: 25 },
-    { id: 2, name: 'test_db', instance: '测试MySQL实例2', size: '2GB', tables: 8 }
-  ]);
+  // 获取数据库数据
+  const fetchDatabases = async () => {
+    setLoadingDatabases(true);
+    try {
+      const response = await mysqlDatabaseApi.getDatabases();
+      setDatabases(response.data || []);
+    } catch (error) {
+      message.error('获取数据库数据失败: ' + error.message);
+    } finally {
+      setLoadingDatabases(false);
+    }
+  };
 
-  // Mock data for tables
-  const [tables, setTables] = useState([
-    { id: 1, name: 'users', database: 'production_db', rows: 10000, size: '5MB' },
-    { id: 2, name: 'orders', database: 'production_db', rows: 50000, size: '15MB' }
-  ]);
+  // 获取表数据
+  const fetchTables = async () => {
+    setLoadingTables(true);
+    try {
+      const response = await mysqlTableApi.getTables();
+      setTables(response.data || []);
+    } catch (error) {
+      message.error('获取表数据失败: ' + error.message);
+    } finally {
+      setLoadingTables(false);
+    }
+  };
+
+  // 组件加载时获取数据
+  useEffect(() => {
+    fetchInstances();
+    fetchDatabases();
+    fetchTables();
+  }, []);
+
+  // 切换标签页时刷新数据
+  useEffect(() => {
+    switch (activeTab) {
+      case 'instances':
+        fetchInstances();
+        break;
+      case 'databases':
+        fetchDatabases();
+        break;
+      case 'tables':
+        fetchTables();
+        break;
+      default:
+        break;
+    }
+  }, [activeTab]);
 
   const instanceColumns = [
     {
@@ -61,11 +122,6 @@ const MysqlManagement = () => {
       key: 'port',
     },
     {
-      title: '用户名',
-      dataIndex: 'username',
-      key: 'username',
-    },
-    {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
@@ -74,6 +130,23 @@ const MysqlManagement = () => {
           {status === 'running' ? '运行中' : '已停止'}
         </span>
       )
+    },
+    {
+      title: '环境',
+      dataIndex: 'env',
+      key: 'env',
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'createTime',
+      key: 'createTime',
+      render: (text) => text ? new Date(text).toLocaleString() : ''
+    },
+    {
+      title: '修改时间',
+      dataIndex: 'modifyTime',
+      key: 'modifyTime',
+      render: (text) => text ? new Date(text).toLocaleString() : ''
     },
     {
       title: '操作',
@@ -115,9 +188,13 @@ const MysqlManagement = () => {
       key: 'name',
     },
     {
-      title: '所属实例',
-      dataIndex: 'instance',
-      key: 'instance',
+      title: '所属实例域名',
+      dataIndex: 'instanceHost',
+      key: 'instanceHost',
+      render: (instanceHost) => {
+        const instance = instances.find(inst => inst.host === instanceHost);
+        return instance ? `${instance.name} (${instance.host}:${instance.port})` : instanceHost;
+      }
     },
     {
       title: '大小',
@@ -126,8 +203,20 @@ const MysqlManagement = () => {
     },
     {
       title: '表数量',
-      dataIndex: 'tables',
-      key: 'tables',
+      dataIndex: 'tableCount',
+      key: 'tableCount',
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'createTime',
+      key: 'createTime',
+      render: (text) => text ? new Date(text).toLocaleString() : ''
+    },
+    {
+      title: '修改时间',
+      dataIndex: 'modifyTime',
+      key: 'modifyTime',
+      render: (text) => text ? new Date(text).toLocaleString() : ''
     },
     {
       title: '操作',
@@ -170,18 +259,35 @@ const MysqlManagement = () => {
     },
     {
       title: '所属数据库',
-      dataIndex: 'database',
-      key: 'database',
+      dataIndex: 'dbName',
+      key: 'dbName',
+    },
+    {
+      title: '所属实例',
+      dataIndex: 'instanceHost',
+      key: 'instanceHost',
     },
     {
       title: '行数',
-      dataIndex: 'rows',
-      key: 'rows',
+      dataIndex: 'rowCount',
+      key: 'rowCount',
     },
     {
       title: '大小',
       dataIndex: 'size',
       key: 'size',
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'createTime',
+      key: 'createTime',
+      render: (text) => text ? new Date(text).toLocaleString() : ''
+    },
+    {
+      title: '修改时间',
+      dataIndex: 'modifyTime',
+      key: 'modifyTime',
+      render: (text) => text ? new Date(text).toLocaleString() : ''
     },
     {
       title: '操作',
@@ -224,73 +330,91 @@ const MysqlManagement = () => {
 
   const handleEdit = (type, record) => {
     setEditingRecord({ ...record, type });
-    form.setFieldsValue(record);
+    // 移除时间字段，避免表单验证问题
+    const formData = { ...record };
+    delete formData.createTime;
+    delete formData.modifyTime;
+    form.setFieldsValue(formData);
     setIsModalVisible(true);
   };
 
-  const handleDelete = (type, id) => {
-    switch (type) {
-      case 'instance':
-        setInstances(instances.filter(item => item.id !== id));
-        message.success('实例删除成功');
-        break;
-      case 'database':
-        setDatabases(databases.filter(item => item.id !== id));
-        message.success('数据库删除成功');
-        break;
-      case 'table':
-        setTables(tables.filter(item => item.id !== id));
-        message.success('表删除成功');
-        break;
-      default:
-        break;
+  const handleDelete = async (type, id) => {
+    try {
+      switch (type) {
+        case 'instance':
+          await mysqlInstanceApi.deleteInstance(id);
+          message.success('实例删除成功');
+          fetchInstances();
+          break;
+        case 'database':
+          await mysqlDatabaseApi.deleteDatabase(id);
+          message.success('数据库删除成功');
+          fetchDatabases();
+          break;
+        case 'table':
+          await mysqlTableApi.deleteTable(id);
+          message.success('表删除成功');
+          fetchTables();
+          break;
+        default:
+          break;
+      }
+    } catch (error) {
+      message.error('删除失败: ' + error.message);
     }
   };
 
-  const handleOk = () => {
-    form.validateFields().then(values => {
+  const handleOk = async () => {
+    try {
+      const values = await form.validateFields();
+      
       if (editingRecord) {
         // 编辑操作
         switch (editingRecord.type) {
           case 'instance':
-            setInstances(instances.map(item => 
-              item.id === editingRecord.id ? { ...item, ...values } : item
-            ));
+            await mysqlInstanceApi.updateInstance(editingRecord.id, values);
+            message.success('实例更新成功');
+            fetchInstances();
             break;
           case 'database':
-            setDatabases(databases.map(item => 
-              item.id === editingRecord.id ? { ...item, ...values } : item
-            ));
+            await mysqlDatabaseApi.updateDatabase(editingRecord.id, values);
+            message.success('数据库更新成功');
+            fetchDatabases();
             break;
           case 'table':
-            setTables(tables.map(item => 
-              item.id === editingRecord.id ? { ...item, ...values } : item
-            ));
+            await mysqlTableApi.updateTable(editingRecord.id, values);
+            message.success('表更新成功');
+            fetchTables();
             break;
           default:
             break;
         }
-        message.success('更新成功');
       } else {
         // 新增操作
-        const newRecord = { ...values, id: Date.now() };
         switch (activeTab) {
           case 'instances':
-            setInstances([...instances, newRecord]);
+            await mysqlInstanceApi.createInstance(values);
+            message.success('实例添加成功');
+            fetchInstances();
             break;
           case 'databases':
-            setDatabases([...databases, newRecord]);
+            await mysqlDatabaseApi.createDatabase(values);
+            message.success('数据库添加成功');
+            fetchDatabases();
             break;
           case 'tables':
-            setTables([...tables, newRecord]);
+            await mysqlTableApi.createTable(values);
+            message.success('表添加成功');
+            fetchTables();
             break;
           default:
             break;
         }
-        message.success('添加成功');
       }
       setIsModalVisible(false);
-    });
+    } catch (error) {
+      message.error('操作失败: ' + error.message);
+    }
   };
 
   const handleCancel = () => {
@@ -325,6 +449,7 @@ const MysqlManagement = () => {
               <Table 
                 columns={instanceColumns} 
                 dataSource={instances} 
+                loading={loadingInstances}
                 rowKey="id"
                 pagination={{ pageSize: 10 }}
                 scroll={{ x: 'max-content' }}
@@ -351,6 +476,7 @@ const MysqlManagement = () => {
               <Table 
                 columns={databaseColumns} 
                 dataSource={databases} 
+                loading={loadingDatabases}
                 rowKey="id"
                 pagination={{ pageSize: 10 }}
                 scroll={{ x: 'max-content' }}
@@ -377,6 +503,7 @@ const MysqlManagement = () => {
               <Table 
                 columns={tableColumns} 
                 dataSource={tables} 
+                loading={loadingTables}
                 rowKey="id"
                 pagination={{ pageSize: 10 }}
                 scroll={{ x: 'max-content' }}
@@ -421,18 +548,40 @@ const MysqlManagement = () => {
               </Form.Item>
               
               <Form.Item
-                name="username"
-                label="用户名"
-                rules={[{ required: true, message: '请输入用户名' }]}
+                name="status"
+                label="状态"
+                rules={[{ required: true, message: '请选择状态' }]}
               >
-                <Input placeholder="请输入用户名" />
+                <Select placeholder="请选择状态">
+                  <Option value="running">运行中</Option>
+                  <Option value="stopped">已停止</Option>
+                </Select>
               </Form.Item>
               
               <Form.Item
-                name="status"
-                label="状态"
+                name="env"
+                label="环境"
               >
-                <Input placeholder="请输入状态" />
+                <Select placeholder="请选择环境">
+                  <Option value="prd">生产环境</Option>
+                  <Option value="pre">预发布环境</Option>
+                  <Option value="test">测试环境</Option>
+                  <Option value="dev">开发环境</Option>
+                </Select>
+              </Form.Item>
+              
+              <Form.Item
+                name="creator"
+                label="创建人"
+              >
+                <Input placeholder="请输入创建人" />
+              </Form.Item>
+              
+              <Form.Item
+                name="modifier"
+                label="修改人"
+              >
+                <Input placeholder="请输入修改人" />
               </Form.Item>
             </>
           )}
@@ -448,26 +597,37 @@ const MysqlManagement = () => {
               </Form.Item>
               
               <Form.Item
-                name="instance"
-                label="所属实例"
-                rules={[{ required: true, message: '请输入所属实例' }]}
+                name="instanceHost"
+                label="所属实例域名"
+                rules={[{ required: true, message: '请选择所属实例' }]}
               >
-                <Input placeholder="请输入所属实例" />
+                <Select placeholder="请选择所属实例">
+                  {instances.map(instance => (
+                    <Option key={instance.host} value={instance.host}>
+                      {instance.name} ({instance.host}:{instance.port})
+                    </Option>
+                  ))}
+                </Select>
               </Form.Item>
               
-              <Form.Item
-                name="size"
-                label="大小"
-              >
-                <Input placeholder="请输入大小" />
-              </Form.Item>
-              
-              <Form.Item
-                name="tables"
-                label="表数量"
-              >
-                <InputNumber style={{ width: '100%' }} placeholder="请输入表数量" />
-              </Form.Item>
+              {/* 新增和修改数据库时不需要填写大小和数量 */}
+              {!editingRecord && (
+                <>
+                  <Form.Item
+                    name="creator"
+                    label="创建人"
+                  >
+                    <Input placeholder="请输入创建人" />
+                  </Form.Item>
+                  
+                  <Form.Item
+                    name="modifier"
+                    label="修改人"
+                  >
+                    <Input placeholder="请输入修改人" />
+                  </Form.Item>
+                </>
+              )}
             </>
           )}
           
@@ -482,26 +642,49 @@ const MysqlManagement = () => {
               </Form.Item>
               
               <Form.Item
-                name="database"
+                name="databaseId"
                 label="所属数据库"
-                rules={[{ required: true, message: '请输入所属数据库' }]}
+                rules={[{ required: true, message: '请选择所属数据库' }]}
               >
-                <Input placeholder="请输入所属数据库" />
+                <Select 
+                  showSearch
+                  placeholder="请选择所属数据库"
+                  optionFilterProp="children"
+                  filterOption={(input, option) =>
+                    option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                  }
+                >
+                  {databases.map(database => (
+                    <Option 
+                      key={database.id} 
+                      value={database.id}
+                      dbName={database.name}
+                      instanceHost={database.instanceHost}
+                    >
+                      {database.name} ({database.instanceHost})
+                    </Option>
+                  ))}
+                </Select>
               </Form.Item>
               
-              <Form.Item
-                name="rows"
-                label="行数"
-              >
-                <InputNumber style={{ width: '100%' }} placeholder="请输入行数" />
-              </Form.Item>
-              
-              <Form.Item
-                name="size"
-                label="大小"
-              >
-                <Input placeholder="请输入大小" />
-              </Form.Item>
+              {/* 新增和修改表时不需要填写行数和大小 */}
+              {!editingRecord && (
+                <>
+                  <Form.Item
+                    name="creator"
+                    label="创建人"
+                  >
+                    <Input placeholder="请输入创建人" />
+                  </Form.Item>
+                  
+                  <Form.Item
+                    name="modifier"
+                    label="修改人"
+                  >
+                    <Input placeholder="请输入修改人" />
+                  </Form.Item>
+                </>
+              )}
             </>
           )}
         </Form>
