@@ -55,6 +55,7 @@ const SchemaDesign = () => {
   const [selectedTables, setSelectedTables] = useState([]);
   const [expandedKeys, setExpandedKeys] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedColumn, setSelectedColumn] = useState(null); // 添加selectedColumn状态
   const [tableColumns, setTableColumns] = useState([
     { key: 1, id: 1, status: '新增', name: 'id', type: 'BIGINT', length: '', nullable: false, comment: '主键ID' },
     { key: 2, id: 2, status: '新增', name: 'create_time', type: 'DATETIME', length: '', nullable: false, comment: '创建时间' },
@@ -518,6 +519,22 @@ const SchemaDesign = () => {
       // 检查必填字段
       if (!tableName) {
         message.error('表名不能为空');
+        return;
+      }
+      
+      // 表名校验：只能包含小写字母和下划线，不能有空格
+      if (!/^[a-z_]+$/.test(tableName)) {
+        message.error('表名不符合规范（只能包含小写字母和下划线，不能有空格）');
+        return;
+      }
+      
+      // 列名校验：只能包含小写字母和下划线，不能有空格
+      const invalidColumns = tableColumns.filter(col => {
+        return !col.name || !/^[a-z_]+$/.test(col.name);
+      });
+      
+      if (invalidColumns.length > 0) {
+        message.error(`以下列名不符合规范（只能包含小写字母和下划线，不能有空格）：${invalidColumns.map(col => col.name).join(', ')}`);
         return;
       }
 
@@ -1288,26 +1305,200 @@ const SchemaDesign = () => {
                 columns={columnColumns}
                 pagination={false}
                 rowKey="key"
+                onRow={(record) => ({
+                  onClick: () => setSelectedColumn(record)
+                })}
               />
               
               <Divider>列拓展属性</Divider>
               <div style={{ padding: '16px', backgroundColor: '#fafafa', borderRadius: '4px' }}>
-                <Row gutter={16}>
-                  <Col span={8}>
-                    <Form.Item label="默认值">
-                      <Input placeholder="请输入默认值" />
-                    </Form.Item>
-                  </Col>
-                  <br/>
-                  <Col span={8}>
-                    <Form.Item label="符号">
-                      <Select>
-                        <Option value="signed">有符号</Option>
-                        <Option value="unsigned">无符号</Option>
-                      </Select>
-                    </Form.Item>
-                  </Col>
-                </Row>
+                {selectedColumn && (
+                  <>
+                    {/* 数字类型：INT, BIGINT, SMALLINT, TINYINT, MEDIUMINT */}
+                    {['INT', 'BIGINT', 'SMALLINT', 'TINYINT', 'MEDIUMINT'].includes(selectedColumn.type) && (
+                      <>
+                        <Row gutter={16}>
+                          <Col span={8}>
+                            <Form.Item label="默认值">
+                              <InputNumber
+                                placeholder="请输入默认值"
+                                value={selectedColumn.defaultValue || null}
+                                onChange={(value) => updateColumnAttribute(selectedColumn.key, 'defaultValue', value)}
+                                min={selectedColumn.type === 'BIGINT' ? -9223372036854775808 : -2147483648}
+                                max={selectedColumn.type === 'BIGINT' ? 9223372036854775807 : 2147483647}
+                              />
+                            </Form.Item>
+                          </Col>
+                          <Col span={8}>
+                            <Form.Item label="符号">
+                              <Select
+                                value={selectedColumn.unsigned ? 'unsigned' : 'signed'}
+                                onChange={(value) => updateColumnAttribute(selectedColumn.key, 'unsigned', value === 'unsigned')}
+                              >
+                                <Option value="signed">有符号</Option>
+                                <Option value="unsigned">无符号</Option>
+                              </Select>
+                            </Form.Item>
+                          </Col>
+                          <Col span={8}>
+                            <Form.Item label="自增">
+                              <Switch
+                                checked={!!selectedColumn.autoIncrement}
+                                onChange={(checked) => updateColumnAttribute(selectedColumn.key, 'autoIncrement', checked)}
+                              />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                      </>
+                    )}
+                    
+                    {/* 小数类型：DECIMAL */}
+                    {selectedColumn.type === 'DECIMAL' && (
+                      <>
+                        <Row gutter={16}>
+                          <Col span={8}>
+                            <Form.Item label="默认值">
+                              <InputNumber
+                                placeholder="请输入默认值"
+                                value={selectedColumn.defaultValue || null}
+                                onChange={(value) => updateColumnAttribute(selectedColumn.key, 'defaultValue', value)}
+                                precision={selectedColumn.decimalDigits || 2}
+                                min={-999999999}
+                                max={999999999}
+                              />
+                            </Form.Item>
+                          </Col>
+                          <Col span={8}>
+                            <Form.Item label="符号">
+                              <Select
+                                value={selectedColumn.unsigned ? 'unsigned' : 'signed'}
+                                onChange={(value) => updateColumnAttribute(selectedColumn.key, 'unsigned', value === 'unsigned')}
+                              >
+                                <Option value="signed">有符号</Option>
+                                <Option value="unsigned">无符号</Option>
+                              </Select>
+                            </Form.Item>
+                          </Col>
+                          <Col span={8}>
+                            <Form.Item label="小数位长">
+                              <InputNumber
+                                placeholder="小数位数"
+                                value={selectedColumn.decimalDigits || 2}
+                                onChange={(value) => updateColumnAttribute(selectedColumn.key, 'decimalDigits', value)}
+                                min={0}
+                                max={30}
+                              />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                      </>
+                    )}
+                    
+                    {/* 字符串类型：CHAR, VARCHAR */}
+                    {['CHAR', 'VARCHAR'].includes(selectedColumn.type) && (
+                      <>
+                        <Row gutter={16}>
+                          <Col span={8}>
+                            <Form.Item label="默认值">
+                              <Select
+                                placeholder="请选择默认值"
+                                value={selectedColumn.defaultValue || ''}
+                                onChange={(value) => updateColumnAttribute(selectedColumn.key, 'defaultValue', value)}
+                              >
+                                <Option value="NULL">NULL</Option>
+                                <Option value="">Empty_String (空字符串)</Option>
+                                <Option value="custom">自定义</Option>
+                              </Select>
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        {selectedColumn.defaultValue === 'custom' && (
+                          <Row gutter={16}>
+                            <Col span={8} offset={0}>
+                              <Form.Item>
+                                <Input
+                                  placeholder="请输入自定义默认值"
+                                  onChange={(e) => updateColumnAttribute(selectedColumn.key, 'defaultValue', e.target.value)}
+                                />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                        )}
+                      </>
+                    )}
+                    
+                    {/* 时间类型：DATETIME, TIMESTAMP */}
+                    {['DATETIME', 'TIMESTAMP'].includes(selectedColumn.type) && (
+                      <>
+                        <Row gutter={16}>
+                          <Col span={8}>
+                            <Form.Item label="默认值">
+                              <Select
+                                placeholder="请选择默认值"
+                                value={selectedColumn.defaultValue || ''}
+                                onChange={(value) => updateColumnAttribute(selectedColumn.key, 'defaultValue', value)}
+                              >
+                                <Option value="NULL">NULL</Option>
+                                <Option value="CURRENT_TIMESTAMP">CURRENT_TIMESTAMP</Option>
+                                <Option value="custom">自定义</Option>
+                              </Select>
+                            </Form.Item>
+                          </Col>
+                          <Col span={8}>
+                            <Form.Item label="更新策略">
+                              <Switch
+                                checked={!!selectedColumn.onUpdateCurrentTimestamp}
+                                onChange={(checked) => updateColumnAttribute(selectedColumn.key, 'onUpdateCurrentTimestamp', checked)}
+                                checkedChildren="ON UPDATE CURRENT_TIMESTAMP"
+                                unCheckedChildren="不更新"
+                              />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        {selectedColumn.defaultValue === 'custom' && (
+                          <Row gutter={16}>
+                            <Col span={8} offset={0}>
+                              <Form.Item>
+                                <Input
+                                  placeholder="请输入自定义默认值"
+                                  onChange={(e) => updateColumnAttribute(selectedColumn.key, 'defaultValue', e.target.value)}
+                                />
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                        )}
+                      </>
+                    )}
+                    
+                    {/* 长文本/JSON类型：TEXT, MEDIUMTEXT, JSON */}
+                    {['TEXT', 'MEDIUMTEXT', 'JSON'].includes(selectedColumn.type) && (
+                      <>
+                        <Row gutter={16}>
+                          <Col span={16}>
+                            <Form.Item>
+                              <span className="ant-form-text">提示：长文本和JSON类型字段默认不支持设置默认值，系统已自动勾选"可空"选项</span>
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        {/* 自动设置可空属性 */}
+                        {selectedColumn.nullable !== true && (
+                          <Row gutter={16}>
+                            <Col span={16}>
+                              <Form.Item>
+                                <Button
+                                  type="link"
+                                  onClick={() => updateColumnAttribute(selectedColumn.key, 'nullable', true)}
+                                >
+                                  点击设置此字段为可空
+                                </Button>
+                              </Form.Item>
+                            </Col>
+                          </Row>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
               </div>
             </Card>
           </TabPane>
