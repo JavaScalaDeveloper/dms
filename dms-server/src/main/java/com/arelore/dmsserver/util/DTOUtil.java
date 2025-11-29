@@ -4,10 +4,12 @@ import com.arelore.dmsserver.dto.MysqlDatabaseDTO;
 import com.arelore.dmsserver.dto.MysqlInstanceDTO;
 import com.arelore.dmsserver.dto.MysqlTableInfoDTO;
 import com.arelore.dmsserver.dto.SchemaDesignWorkOrderDTO;
+import com.arelore.dmsserver.dto.TableStructureDesignDTO;
 import com.arelore.dmsserver.entity.MysqlDatabase;
 import com.arelore.dmsserver.entity.MysqlInstance;
 import com.arelore.dmsserver.entity.MysqlTableInfo;
 import com.arelore.dmsserver.entity.SchemaDesignWorkOrder;
+import com.arelore.dmsserver.entity.TableStructureDesign;
 
 public class DTOUtil {
     
@@ -156,6 +158,51 @@ public class DTOUtil {
         entity.setRelatedPerson(dto.getRelatedPerson());
         entity.setProjectBackground(dto.getProjectBackground());
         entity.setStatus(dto.getStatus());
+        return entity;
+    }
+    
+    // TableStructureDesign转换
+    public static TableStructureDesignDTO toDTO(TableStructureDesign entity) {
+        if (entity == null) {
+            return null;
+        }
+        TableStructureDesignDTO dto = new TableStructureDesignDTO();
+        dto.setId(entity.getId());
+        dto.setCreateTime(entity.getCreateTime());
+        dto.setModifyTime(entity.getModifyTime());
+        dto.setCreator(entity.getCreator());
+        dto.setModifier(entity.getModifier());
+        dto.setWorkOrderId(entity.getWorkOrderId());
+        dto.setTableName(entity.getTableName());
+        dto.setTableComment(entity.getTableComment());
+        dto.setCharset(entity.getCharset());
+        dto.setAutoIncrementStart(entity.getAutoIncrementStart());
+        dto.setColumnsInfo(entity.getColumnsInfo());
+        dto.setIndexesInfo(entity.getIndexesInfo());
+        dto.setCurrentVersion(entity.getCurrentVersion());
+        dto.setOperateType(entity.getOperateType());
+        return dto;
+    }
+    
+    public static TableStructureDesign toEntity(TableStructureDesignDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        TableStructureDesign entity = new TableStructureDesign();
+        entity.setId(dto.getId());
+        entity.setCreateTime(dto.getCreateTime());
+        entity.setModifyTime(dto.getModifyTime());
+        entity.setCreator(dto.getCreator());
+        entity.setModifier(dto.getModifier());
+        entity.setWorkOrderId(dto.getWorkOrderId());
+        entity.setTableName(dto.getTableName());
+        entity.setTableComment(dto.getTableComment());
+        entity.setCharset(dto.getCharset());
+        entity.setAutoIncrementStart(dto.getAutoIncrementStart());
+        entity.setColumnsInfo(dto.getColumnsInfo());
+        entity.setIndexesInfo(dto.getIndexesInfo());
+        entity.setCurrentVersion(dto.getCurrentVersion());
+        entity.setOperateType(dto.getOperateType());
         return entity;
     }
 }

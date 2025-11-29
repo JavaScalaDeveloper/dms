@@ -34,7 +34,7 @@ import {
   DownloadOutlined,
   DatabaseOutlined
 } from '@ant-design/icons';
-import { schemaDesignApi, mysqlDatabaseApi } from '../../../services/mysqlApi';
+import { schemaDesignApi, mysqlDatabaseApi, tableStructureDesignApi } from '../../../services/mysqlApi';
 
 const { Option } = Select;
 const { TabPane } = Tabs;
@@ -67,6 +67,9 @@ const SchemaDesign = () => {
   // 结构设计数据
   const [schemaDesigns, setSchemaDesigns] = useState([]);
   
+  // 工单下的表结构设计数据
+  const [tableStructureDesigns, setTableStructureDesigns] = useState([]);
+  
   // 获取结构设计列表数据
   const fetchSchemaDesigns = async () => {
     setLoading(true);
@@ -93,6 +96,32 @@ const SchemaDesign = () => {
       setLoading(false);
     }
   };
+  
+  // 获取工单下的表结构设计数据
+  const fetchTableStructureDesigns = async (workOrderId) => {
+    try {
+      const response = await tableStructureDesignApi.listByWorkOrderId(workOrderId);
+      if (response.success) {
+        setTableStructureDesigns(response.data || []);
+      } else {
+        message.error(`获取表结构设计数据失败: ${response.message || '未知错误'}`);
+        setTableStructureDesigns([]);
+      }
+    } catch (error) {
+      console.error('获取表结构设计数据失败:', error);
+      message.error('获取表结构设计数据失败，请稍后重试');
+      setTableStructureDesigns([]);
+    }
+  };
+
+  // 当工单改变时，获取工单下的表结构设计数据
+  useEffect(() => {
+    if (workOrder?.id) {
+      fetchTableStructureDesigns(workOrder.id);
+    } else {
+      setTableStructureDesigns([]);
+    }
+  }, [workOrder?.id]);
   
   // 组件加载时获取数据
   useEffect(() => {
@@ -469,9 +498,128 @@ const SchemaDesign = () => {
     setTableIndexes([...tableIndexes, newIndex]);
   };
 
-  // 删除索引
-  const handleDeleteIndex = (key) => {
-    setTableIndexes(tableIndexes.filter(idx => idx.key !== key));
+  // 保存变更计划
+  const handleSaveChangePlan = async () => {
+    console.log('点击了保存变更计划按钮');
+    try {
+      // 先验证表单
+      console.log('开始验证表单');
+      await tableForm.validateFields();
+      console.log('表单验证通过');
+      
+      // 准备要保存的数据
+      const tableName = tableForm.getFieldValue('tableName');
+      const tableComment = tableForm.getFieldValue('tableComment');
+      const charset = tableForm.getFieldValue('charset');
+      const autoIncrement = tableForm.getFieldValue('autoIncrement');
+      
+      console.log('表单字段值:', { tableName, tableComment, charset, autoIncrement });
+      
+      // 检查必填字段
+      if (!tableName) {
+        message.error('表名不能为空');
+        return;
+      }
+
+      const tableStructureDesign = {
+        workOrderId: workOrder?.id || 0,
+        tableName: tableName || '',
+        tableComment: tableComment || '',
+        charset: charset || 'utf8mb4',
+        autoIncrementStart: autoIncrement || 1,
+        columnsInfo: JSON.stringify(tableColumns),
+        indexesInfo: JSON.stringify(tableIndexes),
+        currentVersion: 1, // 默认版本号为1
+        operateType: 'create' // 默认操作类型为新建表
+      };
+
+      console.log('准备保存的数据:', tableStructureDesign);
+      
+      // 调用后端接口保存数据
+      console.log('开始调用后端接口保存数据');
+      const response = await tableStructureDesignApi.save(tableStructureDesign);
+      
+      console.log('保存响应:', response);
+      
+      if (response.success === true) {
+        message.success('保存成功');
+        // 保存成功后，切换到项目首页tab并刷新列表
+        setCurrentLevel3Tab('project-home');
+        // 刷新表结构设计列表
+        if (workOrder?.id) {
+          fetchTableStructureDesigns(workOrder.id);
+        }
+      } else {
+        message.error(`保存失败: ${response.message || '未知错误'}`);
+      }
+    } catch (error) {
+      console.error('保存变更计划失败:', error);
+      if (error.errorFields) {
+        console.log('表单验证错误字段:', error.errorFields);
+        message.error('表单验证失败，请检查输入内容');
+      } else {
+        message.error('保存变更计划失败，请稍后重试');
+      }
+    }
+  };
+
+  // 编辑表
+  const handleEditTable = (record) => {
+    console.log('编辑表:', record);
+    // 切换到新建物理表tab
+    setCurrentLevel3Tab('table-design');
+    
+    // 回显表基本信息
+    if (tableForm) {
+      tableForm.setFieldsValue({
+        tableName: record.tableName || '',
+        tableComment: record.tableComment || '',
+        charset: record.charset || 'utf8mb4',
+        autoIncrement: record.autoIncrementStart || 1
+      });
+    }
+    
+    // 回显列信息
+    if (record.columnsInfo) {
+      try {
+        const columns = JSON.parse(record.columnsInfo);
+        setTableColumns(columns);
+      } catch (error) {
+        console.error('解析列信息失败:', error);
+        setTableColumns([]);
+      }
+    } else {
+      setTableColumns([]);
+    }
+    
+    // 回显索引信息
+    if (record.indexesInfo) {
+      try {
+        const indexes = JSON.parse(record.indexesInfo);
+        setTableIndexes(indexes);
+      } catch (error) {
+        console.error('解析索引信息失败:', error);
+        setTableIndexes([]);
+      }
+    } else {
+      setTableIndexes([]);
+    }
+    
+    message.info(`正在编辑表: ${record.tableName}`);
+  };
+
+  // 预览SQL
+  const handlePreviewSQL = (record) => {
+    console.log('预览SQL:', record);
+    // 这里可以实现预览SQL的逻辑
+    message.info(`预览SQL: ${record.tableName}`);
+  };
+
+  // 回滚
+  const handleRollback = (record) => {
+    console.log('回滚:', record);
+    // 这里可以实现回滚的逻辑
+    message.info(`回滚: ${record.tableName}`);
   };
 
   // 渲染步骤内容
@@ -915,120 +1063,159 @@ const SchemaDesign = () => {
     // 现在使用组件级别的currentLevel3Tab状态
     
     // 渲染项目首页内容
-      const renderProjectHome = () => {
-        return (
-          <Row gutter={16}>
-            <Col span={8}>
-              <Card
-                title="数据库表结构"
-                bodyStyle={{ padding: 0 }}
-                style={{ height: '100%' }}
-              >
-                <div style={{ padding: '16px', borderBottom: '1px solid #f5f5f5' }}>
-                  <Input.Search 
-                    placeholder="搜索表名" 
-                    allowClear
-                  />
-                </div>
-                <div style={{ padding: '16px', maxHeight: 480, overflowY: 'auto' }}>
-                  {tables.map(table => (
-                    <div 
-                      key={table.id} 
-                      className="flex items-center gap-2 p-2 hover:bg-blue-50 rounded cursor-pointer transition-colors"
-                    >
-                      <DatabaseOutlined size={16} className="text-blue-500" />
-                      <span className="text-sm">{table.name}</span>
-                    </div>
-                  ))}
-                  {tables.length === 0 && (
-                    <div className="text-center text-gray-400 py-4 text-sm">
-                      暂无表数据
-                    </div>
-                  )}
-                </div>
-              </Card>
-            </Col>
-            <Col span={16}>
-              <Card
-                title="工单概览"
-                extra={
-                  <Space>
-                    <Button type="primary" onClick={() => setCurrentLevel3Tab('table-design')}>
-                      <PlusOutlined /> 新建物理表
-                    </Button>
-                    <Button onClick={() => setCurrentLevel3Tab('table-design')}>
-                      <DownloadOutlined /> 导入SQL语句
-                    </Button>
-                  </Space>
-                }
-              >
-                <div style={{ marginBottom: 12 }}>
-                  <span className="text-sm text-gray-500">工单ID: </span>
-                  <span className="font-medium">{workOrder?.id ?? '-'}</span>
-                </div>
-                <div style={{ color: '#666', marginBottom: 16 }}>
-                  <span>项目名称: {workOrder?.projectName || '-'}</span>
-                  <span style={{ margin: '0 8px' }}>|</span>
-                  <span>数据库类型: {workOrder?.databaseType || '-'}</span>
-                  <span style={{ margin: '0 8px' }}>|</span>
-                  <span>变更基准库: {workOrder?.changeBaseline || '-'}</span>
-                </div>
-
-                {/* 工单下的表清单 */}
-                <Table
-                  size="small"
-                  dataSource={tables}
-                  rowKey="id"
-                  pagination={false}
-                  columns={[
-                    {
-                      title: '序号',
-                      key: 'index',
-                      width: 60,
-                      align: 'center',
-                      render: (_, __, index) => index + 1,
-                    },
-                    {
-                      title: '状态',
-                      key: 'status',
-                      width: 100,
-                      render: () => '新建表',
-                    },
-                    {
-                      title: '表名',
-                      dataIndex: 'name',
-                      key: 'name',
-                    },
-                    {
-                      title: '当前版本',
-                      key: 'version',
-                      width: 100,
-                      align: 'center',
-                      render: () => '1',
-                    },
-                    {
-                      title: '最后修改人',
-                      key: 'lastModifier',
-                      width: 120,
-                      render: () => workOrder?.modifier || '-',
-                    },
-                    {
-                      title: '最后修改时间',
-                      key: 'lastModifiedTime',
-                      width: 180,
-                      render: () => workOrder?.modifyTime || '-',
-                    },
-                  ]}
+    const renderProjectHome = () => {
+      return (
+        <Row gutter={16}>
+          <Col span={8}>
+            <Card
+              title="数据库表结构"
+              bodyStyle={{ padding: 0 }}
+              style={{ height: '100%' }}
+            >
+              <div style={{ padding: '16px', borderBottom: '1px solid #f5f5f5' }}>
+                <Input.Search 
+                  placeholder="搜索表名" 
+                  allowClear
                 />
+              </div>
+              <div style={{ padding: '16px', maxHeight: 480, overflowY: 'auto' }}>
+                {tables.map(table => (
+                  <div 
+                    key={table.id} 
+                    className="flex items-center gap-2 p-2 hover:bg-blue-50 rounded cursor-pointer transition-colors"
+                  >
+                    <DatabaseOutlined size={16} className="text-blue-500" />
+                    <span className="text-sm">{table.name}</span>
+                  </div>
+                ))}
+                {tables.length === 0 && (
+                  <div className="text-center text-gray-400 py-4 text-sm">
+                    暂无表数据
+                  </div>
+                )}
+              </div>
+            </Card>
+          </Col>
+          <Col span={16}>
+            <Card
+              title="工单概览"
+              extra={
+                <Space>
+                  <Button type="primary" onClick={() => setCurrentLevel3Tab('table-design')}>
+                    <PlusOutlined /> 新建物理表
+                  </Button>
+                  <Button onClick={() => setCurrentLevel3Tab('table-design')}>
+                    <DownloadOutlined /> 导入SQL语句
+                  </Button>
+                </Space>
+              }
+            >
+              <div style={{ marginBottom: 12 }}>
+                <span className="text-sm text-gray-500">工单ID: </span>
+                <span className="font-medium">{workOrder?.id ?? '-'}</span>
+              </div>
+              <div style={{ color: '#666', marginBottom: 16 }}>
+                <span>项目名称: {workOrder?.projectName || '-'}</span>
+                <span style={{ margin: '0 8px' }}>|</span>
+                <span>数据库类型: {workOrder?.databaseType || '-'}</span>
+                <span style={{ margin: '0 8px' }}>|</span>
+                <span>变更基准库: {workOrder?.changeBaseline || '-'}</span>
+                <span style={{ margin: '0 8px' }}>|</span>
+                <span>当前版本: {workOrder?.currentVersion || '0'}</span>
+              </div>
 
-                <div style={{ textAlign: 'center', color: '#999', marginTop: 24 }}>
-                  请选择左侧的表进行设计，或点击"新建物理表"创建新表
-                </div>
-              </Card>
-            </Col>
-          </Row>
-        );
-      };
+              {/* 工单下的表清单 */}
+              <Table
+                size="small"
+                dataSource={tableStructureDesigns}
+                rowKey="id"
+                pagination={false}
+                columns={[
+                  {
+                    title: '序号',
+                    key: 'index',
+                    width: 60,
+                    align: 'center',
+                    render: (_, __, index) => index + 1,
+                  },
+                  {
+                    title: '状态',
+                    key: 'status',
+                    width: 100,
+                    render: () => '已设计',
+                  },
+                  {
+                    title: '表名',
+                    dataIndex: 'tableName',
+                    key: 'tableName',
+                  },
+                  {
+                    title: '操作类型',
+                    dataIndex: 'operateType',
+                    key: 'operateType',
+                    width: 100,
+                    render: (text) => {
+                      switch (text) {
+                        case 'create':
+                          return '新建表';
+                        case 'modify':
+                          return '修改表';
+                        default:
+                          return text || '-';
+                      }
+                    },
+                  },
+                  {
+                    title: '当前版本',
+                    dataIndex: 'currentVersion',
+                    key: 'currentVersion',
+                    width: 100,
+                    align: 'center',
+                    render: (text) => `v${text || '1'}`,
+                  },
+                  {
+                    title: '最后修改人',
+                    dataIndex: 'modifier',
+                    key: 'modifier',
+                    width: 120,
+                    render: (text) => text || '-',
+                  },
+                  {
+                    title: '最后修改时间',
+                    dataIndex: 'modifyTime',
+                    key: 'modifyTime',
+                    width: 180,
+                    render: (text) => text || '-',
+                  },
+                  {
+                    title: '操作',
+                    key: 'action',
+                    width: 150,
+                    render: (_, record) => (
+                      <Space>
+                        <Button type="link" size="small" onClick={() => handleEditTable(record)}>
+                          编辑表
+                        </Button>
+                        <Button type="link" size="small" onClick={() => handlePreviewSQL(record)}>
+                          预览SQL
+                        </Button>
+                        <Button type="link" size="small" onClick={() => handleRollback(record)} danger>
+                          回滚
+                        </Button>
+                      </Space>
+                    ),
+                  },
+                ]}
+              />
+
+              <div style={{ textAlign: 'center', color: '#999', marginTop: 24 }}>
+                请选择左侧的表进行设计，或点击"新建物理表"创建新表
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      );
+    };
     
     // 渲染新建物理表内容
     const renderTableDesign = () => (
@@ -1111,6 +1298,7 @@ const SchemaDesign = () => {
                       <Input placeholder="请输入默认值" />
                     </Form.Item>
                   </Col>
+                  <br/>
                   <Col span={8}>
                     <Form.Item label="符号">
                       <Select>
@@ -1147,7 +1335,9 @@ const SchemaDesign = () => {
         </Tabs>
         
         <div style={{ textAlign: 'center', marginTop: 24 }}>
-          <Button type="primary" icon={<SaveOutlined />}>保存变更计划</Button>
+          <Button type="primary" icon={<SaveOutlined />} onClick={handleSaveChangePlan} style={{ marginRight: 16 }}>
+            保存变更计划
+          </Button>
         </div>
       </div>
     );

@@ -145,4 +145,11 @@ export const schemaDesignApi = {
   getWorkOrders: () => mysqlApiClient.post(`${API_CONFIG.SCHEMA_ENDPOINTS.WORK_ORDERS}/list`),
 };
 
+// 表结构设计相关API
+export const tableStructureDesignApi = {
+  save: (data) => mysqlApiClient.post(`/table-structure-design-detail/save`, data),
+  getByWorkOrderId: (workOrderId) => mysqlApiClient.post(`/table-structure-design-detail/get-by-work-order`, { workOrderId }),
+  listByWorkOrderId: (workOrderId) => mysqlApiClient.get(`/table-structure-design-detail/list-by-work-order?workOrderId=${workOrderId}`),
+};
+
 export default mysqlApiClient;
