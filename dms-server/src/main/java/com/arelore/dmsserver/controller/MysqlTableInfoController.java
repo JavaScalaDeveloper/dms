@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/mysql/tables")
@@ -30,9 +29,7 @@ public class MysqlTableInfoController {
      */
     @PostMapping("/list")
     public ApiResponse<List<MysqlTableInfoDTO>> getAllTables() {
-        List<MysqlTableInfoDTO> tables = mysqlTableInfoService.list().stream()
-                .map(DTOUtil::toDTO)
-                .collect(Collectors.toList());
+        List<MysqlTableInfoDTO> tables = mysqlTableInfoService.getAllTableInfoDTOs();
         return ApiResponse.success(tables);
     }
     
@@ -41,8 +38,8 @@ public class MysqlTableInfoController {
      */
     @PostMapping("/get")
     public ApiResponse<MysqlTableInfoDTO> getTableById(@RequestBody IdRequestDTO request) {
-        MysqlTableInfo table = mysqlTableInfoService.getById(request.getId());
-        return ApiResponse.success(DTOUtil.toDTO(table));
+        MysqlTableInfoDTO table = mysqlTableInfoService.getTableInfoDTOById(request.getId());
+        return ApiResponse.success(table);
     }
     
     /**
@@ -50,10 +47,7 @@ public class MysqlTableInfoController {
      */
     @PostMapping("/listByDatabaseId")
     public ApiResponse<List<MysqlTableInfoDTO>> getTablesByDatabaseId(@RequestBody DatabaseIdRequestDTO request) {
-        List<MysqlTableInfoDTO> tables = mysqlTableInfoService.list(
-                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<MysqlTableInfo>()
-                        .eq("database_id", request.getDatabaseId())
-        ).stream().map(DTOUtil::toDTO).collect(Collectors.toList());
+        List<MysqlTableInfoDTO> tables = mysqlTableInfoService.listDTOsByDatabaseId(request.getDatabaseId());
         return ApiResponse.success(tables);
     }
     
@@ -64,7 +58,7 @@ public class MysqlTableInfoController {
     public ApiResponse<MysqlTableInfoDTO> createTable(@RequestBody MysqlTableInfoDTO tableDTO) {
         MysqlTableInfo table = DTOUtil.toEntity(tableDTO);
         mysqlTableInfoService.save(table);
-        return ApiResponse.success("创建成功", DTOUtil.toDTO(table));
+        return ApiResponse.success("创建成功", mysqlTableInfoService.getTableInfoDTOById(table.getId()));
     }
     
     /**
@@ -74,7 +68,7 @@ public class MysqlTableInfoController {
     public ApiResponse<MysqlTableInfoDTO> updateTable(@RequestBody MysqlTableInfoDTO tableDTO) {
         MysqlTableInfo table = DTOUtil.toEntity(tableDTO);
         mysqlTableInfoService.updateById(table);
-        return ApiResponse.success("更新成功", DTOUtil.toDTO(mysqlTableInfoService.getById(table.getId())));
+        return ApiResponse.success("更新成功", mysqlTableInfoService.getTableInfoDTOById(table.getId()));
     }
     
     /**

@@ -5,7 +5,6 @@ import com.arelore.dmsserver.dto.TableStructureDesignDTO;
 import com.arelore.dmsserver.dto.WorkOrderIdRequestDTO;
 import com.arelore.dmsserver.entity.TableStructureDesign;
 import com.arelore.dmsserver.service.TableStructureDesignService;
-import com.arelore.dmsserver.util.DTOUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,27 +25,8 @@ public class TableStructureDesignController {
     @PostMapping("/save")
     public ApiResponse saveTableStructureDesign(@RequestBody TableStructureDesignDTO tableStructureDesignDTO) {
         try {
-            TableStructureDesign tableStructureDesign = DTOUtil.toEntity(tableStructureDesignDTO);
-            
-            // 根据工单ID和表名判断记录是否存在
-            TableStructureDesign existingRecord = tableStructureDesignService.lambdaQuery()
-                    .eq(TableStructureDesign::getWorkOrderId, tableStructureDesign.getWorkOrderId())
-                    .eq(TableStructureDesign::getTableName, tableStructureDesign.getTableName())
-                    .one();
-            
-            if (existingRecord != null) {
-                // 如果记录存在，则更新
-                tableStructureDesign.setId(existingRecord.getId());
-                // 版本号自增
-                tableStructureDesign.setCurrentVersion(existingRecord.getCurrentVersion() + 1);
-                tableStructureDesignService.updateById(tableStructureDesign);
-            } else {
-                // 如果记录不存在，则新增
-                tableStructureDesign.setCurrentVersion(1);
-                tableStructureDesignService.save(tableStructureDesign);
-            }
-            
-            return ApiResponse.success("保存成功");
+            TableStructureDesign result = tableStructureDesignService.saveTableStructureDesign(tableStructureDesignDTO);
+            return ApiResponse.success("保存成功", tableStructureDesignService.getTableStructureDesignDTOById(result.getId()));
         } catch (Exception e) {
             return ApiResponse.error("保存失败: " + e.getMessage());
         }
@@ -65,12 +45,7 @@ public class TableStructureDesignController {
                 return ApiResponse.error("工单ID不能为空");
             }
             
-            // 获取该工单下的所有表结构设计，返回最新创建的一个
-            TableStructureDesign tableStructureDesign = tableStructureDesignService.lambdaQuery()
-                    .eq(TableStructureDesign::getWorkOrderId, workOrderId)
-                    .orderByDesc(TableStructureDesign::getCreateTime)
-                    .last("LIMIT 1")
-                    .one();
+            TableStructureDesign tableStructureDesign = tableStructureDesignService.getByWorkOrderId(workOrderId);
             return ApiResponse.success(tableStructureDesign);
         } catch (Exception e) {
             return ApiResponse.error("查询失败: " + e.getMessage());
@@ -85,9 +60,7 @@ public class TableStructureDesignController {
     @GetMapping("/list-by-work-order")
     public ApiResponse listByWorkOrderId(@RequestParam Long workOrderId) {
         try {
-            List<TableStructureDesign> tableStructureDesignList = tableStructureDesignService.lambdaQuery()
-                    .eq(TableStructureDesign::getWorkOrderId, workOrderId)
-                    .list();
+            List<TableStructureDesignDTO> tableStructureDesignList = tableStructureDesignService.listDTOsByWorkOrderId(workOrderId);
             return ApiResponse.success(tableStructureDesignList);
         } catch (Exception e) {
             return ApiResponse.error("查询失败: " + e.getMessage());

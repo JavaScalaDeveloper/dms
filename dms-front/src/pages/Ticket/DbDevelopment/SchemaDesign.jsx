@@ -20,7 +20,9 @@ import {
   Menu,
   Typography,
   InputNumber,
-  Checkbox
+  Checkbox,
+  Radio,
+  Switch
 } from 'antd';
 import { 
   PlusOutlined,
@@ -34,6 +36,7 @@ import {
   DownloadOutlined,
   DatabaseOutlined
 } from '@ant-design/icons';
+import { useLocation, useNavigate } from 'react-router-dom'; // 使用useNavigate替代useHistory
 import { schemaDesignApi, mysqlDatabaseApi, tableStructureDesignApi } from '../../../services/mysqlApi';
 
 const { Option } = Select;
@@ -58,12 +61,24 @@ const SchemaDesign = () => {
   const [selectedColumn, setSelectedColumn] = useState(null); // 添加selectedColumn状态
   const [tableColumns, setTableColumns] = useState([
     { key: 1, id: 1, status: '新增', name: 'id', type: 'BIGINT', length: '', nullable: false, comment: '主键ID' },
-    { key: 2, id: 2, status: '新增', name: 'create_time', type: 'DATETIME', length: '', nullable: false, comment: '创建时间' },
-    { key: 3, id: 3, status: '新增', name: 'update_time', type: 'DATETIME', length: '', nullable: false, comment: '更新时间' }
+    { key: 2, id: 2, status: '新增', name: 'create_time', type: 'DATETIME', length: '', nullable: false, comment: '创建时间', editable: true },
+    { key: 3, id: 3, status: '新增', name: 'update_time', type: 'DATETIME', length: '', nullable: false, comment: '更新时间', editable: true }
   ]);
   const [tableIndexes, setTableIndexes] = useState([
     { key: 1, id: 1, status: '新增', name: 'PRIMARY', type: 'Primary', columns: ['id'] }
   ]);
+  
+  // 添加执行变更弹窗相关的状态
+  const [isExecuteModalVisible, setIsExecuteModalVisible] = useState(false);
+  const [executeForm] = Form.useForm();
+  
+  // 添加查询相关的状态
+  const [searchTitle, setSearchTitle] = useState('');
+  const [filteredSchemaDesigns, setFilteredSchemaDesigns] = useState([]);
+  
+  // React Router Hooks
+  const location = useLocation();
+  const history = useNavigate();
 
   // 结构设计数据
   const [schemaDesigns, setSchemaDesigns] = useState([]);
@@ -76,17 +91,18 @@ const SchemaDesign = () => {
     setLoading(true);
     try {
       const response = await schemaDesignApi.getWorkOrders();
-      // 假设后端返回的数据结构与前端期望的结构可能有所不同，这里进行必要的数据转换
+      // 保留原始数据结构，不做字段名转换
       const formattedData = response.data.map(item => ({
+        ...item,
         id: item.id,
-        title: item.projectName || item.title, // 使用projectName或title
-        database: item.databaseType || item.database, // 使用databaseType或database
+        title: item.projectName || '', // 保持projectName字段，同时添加title别名用于显示
+        database: item.databaseType || '', // 保持databaseType字段，同时添加database别名用于显示
         status: item.status === 'approved' ? 'approved' : 
                item.status === 'created' ? 'pending' : 
                item.status === 'reviewing' ? 'reviewing' : 'rejected',
-        designer: item.creator || item.designer,
-        reviewer: item.reviewer,
-        createdAt: item.createTime || item.createdAt,
+        designer: item.creator || '-', // creator字段可能不存在
+        reviewer: item.reviewer || '-', // reviewer字段可能不存在
+        createdAt: item.createTime || new Date().toISOString(), // createTime字段可能不存在
         version: item.version || 'v1.0'
       }));
       setSchemaDesigns(formattedData);
@@ -115,6 +131,20 @@ const SchemaDesign = () => {
     }
   };
 
+  // 当步骤变为1且有工单ID时，加载表结构设计数据（用于编辑场景）
+  useEffect(() => {
+    // 从URL参数中获取workOrderId
+    const params = new URLSearchParams(location.search);
+    const workOrderId = params.get('workOrderId');
+    
+    if (currentStep === 1 && workOrderId) {
+      // 加载表结构设计数据
+      fetchTableStructureDesigns(workOrderId);
+      // 注意：根据项目配置要求，禁止清除浏览器中的参数（如workOrderId）
+      // history('', { replace: true });
+    }
+  }, [currentStep, location.search, history]);
+  
   // 当工单改变时，获取工单下的表结构设计数据
   useEffect(() => {
     if (workOrder?.id) {
@@ -123,11 +153,73 @@ const SchemaDesign = () => {
       setTableStructureDesigns([]);
     }
   }, [workOrder?.id]);
+
+  // 当步骤变为1时，确保加载表结构设计数据
+  useEffect(() => {
+    if (currentStep === 1 && workOrder?.id) {
+      fetchTableStructureDesigns(workOrder.id);
+    }
+  }, [currentStep, workOrder?.id]);
   
   // 组件加载时获取数据
   useEffect(() => {
     fetchSchemaDesigns();
   }, []);
+
+  // 处理查询
+  const handleSearch = () => {
+    if (!searchTitle.trim()) {
+      // 如果搜索标题为空，显示所有数据
+      setFilteredSchemaDesigns(schemaDesigns);
+    } else {
+      // 根据设计标题过滤数据
+      const filtered = schemaDesigns.filter(item => 
+        item.title && item.title.toLowerCase().includes(searchTitle.toLowerCase())
+      );
+      setFilteredSchemaDesigns(filtered);
+    }
+  };
+
+  // 重置查询
+  const handleResetSearch = () => {
+    setSearchTitle('');
+    setFilteredSchemaDesigns(schemaDesigns);
+  };
+
+  // 当原始数据发生变化时，更新过滤后的数据
+  useEffect(() => {
+    setFilteredSchemaDesigns(schemaDesigns);
+  }, [schemaDesigns]);
+
+  // 处理URL参数变化
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const workOrderId = params.get('workOrderId');
+    
+    if (workOrderId) {
+      // 查找对应的工单数据
+      const foundWorkOrder = schemaDesigns.find(item => item.id == workOrderId);
+      if (foundWorkOrder) {
+        // 设置工单信息
+        setWorkOrder(foundWorkOrder);
+        // 设置当前步骤为0（创建工单步骤）
+        setCurrentStep(0);
+        // 切换到设计标签页
+        setActiveTab(`design-${foundWorkOrder.id}`);
+        // 重置表单并填充数据
+        designForm.resetFields();
+        designForm.setFieldsValue({
+          projectName: foundWorkOrder.projectName || '',
+          databaseType: foundWorkOrder.databaseType || 'MySQL',
+          changeBaseline: foundWorkOrder.changeBaseline || undefined,
+          projectBackground: foundWorkOrder.projectBackground || '',
+          relatedPerson: foundWorkOrder.relatedPerson || ''
+        });
+        // 注意：根据项目配置要求，禁止清除浏览器中的参数（如workOrderId）
+        // 确保编辑时能正常回显数据
+      }
+    }
+  }, [location.search, schemaDesigns, designForm]);
 
   // 数据库列表状态
   const [databases, setDatabases] = useState([]);
@@ -218,6 +310,17 @@ const SchemaDesign = () => {
 
   const columns = [
     {
+      title: '工单ID',
+      dataIndex: 'id',
+      key: 'id',
+      width: 100,
+      render: (id) => (
+        <Button type="link" onClick={() => handleEditWorkOrder({ id })}>
+          {id}
+        </Button>
+      ),
+    },
+    {
       title: '设计标题',
       dataIndex: 'title',
       key: 'title',
@@ -257,12 +360,6 @@ const SchemaDesign = () => {
       width: 100,
     },
     {
-      title: '审核人',
-      dataIndex: 'reviewer',
-      key: 'reviewer',
-      width: 100,
-    },
-    {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
@@ -274,11 +371,16 @@ const SchemaDesign = () => {
       width: 150,
       render: (_, record) => (
         <Space size="middle">
-          <Button type="link" icon={<EyeOutlined />}>查看</Button>
           {record.status === 'pending' && (
-            <Button type="link" icon={<EditOutlined />}>编辑</Button>
+            <Button type="link" icon={<EditOutlined />} onClick={() => handleEditWorkOrder(record)}>编辑</Button>
           )}
-          <Button type="link" icon={<FileSearchOutlined />}>审核</Button>
+          <Button 
+            type="link" 
+            icon={<DeleteOutlined />} 
+            onClick={() => handleDeleteColumn(record.key)}
+            // id列不允许删除
+            disabled={record.key === 1}
+          />
         </Space>
       ),
     },
@@ -315,6 +417,37 @@ const SchemaDesign = () => {
     setActiveTab(`design-${tempId}`);
     designForm.resetFields();
     designForm.setFieldsValue({ databaseType: 'MySQL' });
+  };
+
+  // 处理编辑工单操作
+  const handleEditWorkOrder = (record) => {
+    // 如果只传入了ID，则需要从schemaDesigns中找到完整的记录
+    let workOrderData = record;
+    if (record.id && Object.keys(record).length === 1) {
+      const found = schemaDesigns.find(item => item.id == record.id);
+      if (found) {
+        workOrderData = found;
+      }
+    }
+    
+    // 更新URL参数
+    history(`?workOrderId=${workOrderData.id}`); // 使用navigate更新URL
+    
+    // 设置工单信息
+    setWorkOrder(workOrderData);
+    // 设置当前步骤为0（创建工单步骤）
+    setCurrentStep(0);
+    // 切换到设计标签页
+    setActiveTab(`design-${workOrderData.id}`);
+    // 重置表单并填充数据
+    designForm.resetFields();
+    designForm.setFieldsValue({
+      projectName: workOrderData.projectName || '',
+      databaseType: workOrderData.databaseType || 'MySQL',
+      changeBaseline: workOrderData.changeBaseline || undefined,
+      projectBackground: workOrderData.projectBackground || '',
+      relatedPerson: workOrderData.relatedPerson || ''
+    });
   };
 
   const handleOk = () => {
@@ -417,7 +550,11 @@ const SchemaDesign = () => {
         setWorkOrderSubmitting(false);
       }
     } else {
-      setCurrentStep(prev => prev + 1);
+      const nextStep = currentStep + 1;
+      setCurrentStep(nextStep);
+      
+      // 注意：根据项目配置要求，禁止清除浏览器中的参数（如workOrderId）
+      // 确保编辑时能正常回显数据
     }
   };
 
@@ -430,6 +567,8 @@ const SchemaDesign = () => {
     setActiveTab('list');
     setCurrentStep(0);
     setWorkOrder(null);
+    // 注意：根据项目配置要求，禁止清除浏览器中的参数（如workOrderId）
+    // 确保编辑时能正常回显数据
   };
 
   const handleCreatePhysicalTable = () => {
@@ -450,6 +589,122 @@ const SchemaDesign = () => {
       // 设置默认显示项目首页tab
       setCurrentLevel3Tab('project-home');
     }
+  };
+
+  // 处理执行变更到基准库按钮点击
+  const handleExecuteChange = () => {
+    setIsExecuteModalVisible(true);
+    // 延迟设置表单字段值，确保表单已挂载
+    setTimeout(() => {
+      executeForm.setFieldsValue({
+        targetDatabase: workOrder?.changeBaseline || '',
+        executeTime: '立即执行',
+        targetScript: generateDDLSql()
+      });
+    }, 0);
+  };
+
+  // 处理进入下一节点按钮点击
+  const handleNextNode = () => {
+    // 这里可以添加进入下一节点的逻辑
+    message.info('进入下一节点功能待实现');
+  };
+
+  // 处理执行变更弹窗的确认操作
+  const handleExecuteModalOk = () => {
+    executeForm.validateFields().then(values => {
+      console.log('执行变更提交数据:', values);
+      // 这里可以添加实际的执行变更逻辑
+      message.success('变更已提交执行');
+      setIsExecuteModalVisible(false);
+      executeForm.resetFields();
+    }).catch(error => {
+      console.error('表单验证失败:', error);
+      message.error('请检查表单填写是否正确');
+    });
+  };
+
+  // 处理执行变更弹窗的取消操作
+  const handleExecuteModalCancel = () => {
+    setIsExecuteModalVisible(false);
+    executeForm.resetFields();
+  };
+
+  // 生成DDL SQL语句
+  const generateDDLSql = () => {
+    if (!tableStructureDesigns || tableStructureDesigns.length === 0) {
+      return '-- 暂无表结构设计数据';
+    }
+
+    let ddlSql = '';
+    tableStructureDesigns.forEach((table, index) => {
+      // 添加表创建语句
+      ddlSql += `-- 创建表: ${table.tableName}\n`;
+      ddlSql += `CREATE TABLE \`${table.tableName}\` (\n`;
+      
+      // 解析列信息
+      try {
+        const columns = JSON.parse(table.columnsInfo || '[]');
+        columns.forEach((col, colIndex) => {
+          ddlSql += `  \`${col.name}\` ${col.type}`;
+          
+          // 添加长度信息（如果有的话）
+          if (col.length) {
+            ddlSql += `(${col.length})`;
+          }
+          
+          // 添加可空性
+          ddlSql += col.nullable ? ' DEFAULT NULL' : ' NOT NULL';
+          
+          // 添加注释
+          if (col.comment) {
+            ddlSql += ` COMMENT '${col.comment}'`;
+          }
+          
+          // 如果不是最后一列，添加逗号
+          if (colIndex < columns.length - 1) {
+            ddlSql += ',';
+          }
+          ddlSql += '\n';
+        });
+      } catch (e) {
+        console.error('解析列信息失败:', e);
+      }
+      
+      // 解析索引信息
+      try {
+        const indexes = JSON.parse(table.indexesInfo || '[]');
+        indexes.forEach((idx, idxIndex) => {
+          if (idx.type === 'Primary') {
+            ddlSql += `  PRIMARY KEY (${idx.columns.map(col => `\`${col}\``).join(', ')})`;
+          } else if (idx.type === 'Unique') {
+            ddlSql += `  UNIQUE KEY \`${idx.name}\` (${idx.columns.map(col => `\`${col}\``).join(', ')})`;
+          } else {
+            ddlSql += `  KEY \`${idx.name}\` (${idx.columns.map(col => `\`${col}\``).join(', ')})`;
+          }
+          
+          ddlSql += ',\n';
+        });
+      } catch (e) {
+        console.error('解析索引信息失败:', e);
+      }
+      
+      // 移除最后的逗号和换行符
+      if (ddlSql.endsWith(',\n')) {
+        ddlSql = ddlSql.slice(0, -2) + '\n';
+      }
+      
+      ddlSql += ') ENGINE=InnoDB';
+      
+      // 添加表注释
+      if (table.tableComment) {
+        ddlSql += ` COMMENT='${table.tableComment}'`;
+      }
+      
+      ddlSql += ';\n\n';
+    });
+    
+    return ddlSql || '-- 无法生成DDL语句';
   };
 
   const menu = (
@@ -477,9 +732,9 @@ const SchemaDesign = () => {
 
   // 删除列
   const handleDeleteColumn = (key) => {
-    // 不允许删除默认的3个列
-    if (key <= 3) {
-      message.warning('不能删除默认列');
+    // id列不允许删除
+    if (key === 1) {
+      message.warning('id列不允许删除');
       return;
     }
     setTableColumns(tableColumns.filter(col => col.key !== key));
@@ -497,6 +752,33 @@ const SchemaDesign = () => {
       columns: []
     };
     setTableIndexes([...tableIndexes, newIndex]);
+  };
+
+  // 删除索引
+  const handleDeleteIndex = (key) => {
+    // 主键索引不可删除
+    if (tableIndexes.find(idx => idx.key === key)?.type === 'Primary') {
+      message.warning('主键索引不可删除');
+      return;
+    }
+    setTableIndexes(tableIndexes.filter(idx => idx.key !== key));
+  };
+
+  // 更新列属性的辅助函数
+  const updateColumnAttribute = (key, attribute, value) => {
+    const newData = [...tableColumns];
+    const index = newData.findIndex(item => item.key === key);
+    if (index !== -1) {
+      newData[index] = {
+        ...newData[index],
+        [attribute]: value
+      };
+      setTableColumns(newData);
+      // 更新选中的列状态
+      if (selectedColumn && selectedColumn.key === key) {
+        setSelectedColumn(newData[index]);
+      }
+    }
   };
 
   // 保存变更计划
@@ -895,7 +1177,7 @@ const SchemaDesign = () => {
       { title: '序号', dataIndex: 'id', key: 'id', width: 60 },
       { title: '状态', dataIndex: 'status', key: 'status', width: 80 },
       { 
-        title: '列名', 
+        title: '字段名', 
         dataIndex: 'name', 
         key: 'name',
         render: (text, record) => (
@@ -907,7 +1189,7 @@ const SchemaDesign = () => {
               newData[index].name = e.target.value;
               setTableColumns(newData);
             }}
-            disabled={record.id <= 3} // 默认列不可编辑
+            disabled={record.key === 1} // 只有id列不可编辑
           />
         )
       },
@@ -924,8 +1206,8 @@ const SchemaDesign = () => {
               newData[index].type = value;
               setTableColumns(newData);
             }}
-            disabled={record.id <= 3} // 默认列不可编辑
             style={{ width: 120 }}
+            disabled={record.key === 1} // 只有id列不可编辑
           >
             {mysqlTypes.map(type => (
               <Option key={type} value={type}>{type}</Option>
@@ -946,7 +1228,7 @@ const SchemaDesign = () => {
               newData[index].length = e.target.value;
               setTableColumns(newData);
             }}
-            disabled={record.id <= 3} // 默认列不可编辑
+            disabled={record.key === 1} // 只有id列不可编辑
           />
         )
       },
@@ -963,7 +1245,7 @@ const SchemaDesign = () => {
               newData[index].nullable = e.target.checked;
               setTableColumns(newData);
             }}
-            disabled={record.id <= 3} // 默认列不可编辑
+            disabled={record.key === 1} // 只有id列不可编辑
           />
         )
       },
@@ -980,7 +1262,7 @@ const SchemaDesign = () => {
               newData[index].comment = e.target.value;
               setTableColumns(newData);
             }}
-            disabled={record.id <= 3} // 默认列不可编辑
+            disabled={record.key === 1} // 只有id列不可编辑
           />
         )
       },
@@ -992,7 +1274,8 @@ const SchemaDesign = () => {
             type="link" 
             icon={<DeleteOutlined />} 
             onClick={() => handleDeleteColumn(record.key)}
-            disabled={record.id <= 3} // 默认列不可删除
+            // id列不允许删除
+            disabled={record.key === 1}
           />
         ),
       },
@@ -1115,14 +1398,31 @@ const SchemaDesign = () => {
           </Col>
           <Col span={16}>
             <Card
-              title="工单概览"
-              extra={
-                <Space>
-                  <Button type="primary" onClick={() => setCurrentLevel3Tab('table-design')}>
+              title={
+                <span>
+                  工单概览
+                  <Button 
+                    type="primary" 
+                    onClick={() => setCurrentLevel3Tab('table-design')}
+                    style={{ marginLeft: 16 }}
+                  >
                     <PlusOutlined /> 新建物理表
                   </Button>
-                  <Button onClick={() => setCurrentLevel3Tab('table-design')}>
+                  <Button 
+                    onClick={() => setCurrentLevel3Tab('table-design')}
+                    style={{ marginLeft: 8 }}
+                  >
                     <DownloadOutlined /> 导入SQL语句
+                  </Button>
+                </span>
+              }
+              extra={
+                <Space>
+                  <Button onClick={handleExecuteChange}>
+                    <DownloadOutlined /> 执行变更到基准库
+                  </Button>
+                  <Button onClick={handleNextNode}>
+                    <DownloadOutlined /> 进入下一节点
                   </Button>
                 </Space>
               }
@@ -1561,19 +1861,40 @@ const SchemaDesign = () => {
       </div>
       
       <Card bodyStyle={{ padding: '0' }}>
-        <Tabs activeKey={activeTab} onChange={setActiveTab}>
+        <Tabs activeKey={activeTab} onChange={(key) => {
+          setActiveTab(key);
+          // 当切换到结构设计列表时，清理URL中的workOrderId参数
+          if (key === 'list') {
+            history(''); // 清理URL参数
+          }
+        }}>
           <TabPane tab="结构设计列表" key="list">
             <div style={{ padding: '24px' }}>
-              <div style={{ marginBottom: '24px', textAlign: 'right' }}>
-                <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateDesign}>
-                  新建结构设计
-                </Button>
+              {/* 查询区域 */}
+              <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <span>设计标题:</span>
+                  <Input 
+                    placeholder="请输入设计标题" 
+                    value={searchTitle}
+                    onChange={(e) => setSearchTitle(e.target.value)}
+                    onPressEnter={handleSearch} // 添加回车键触发查询
+                    style={{ width: '200px' }}
+                  />
+                  <Button type="primary" onClick={handleSearch}>查询</Button>
+                  <Button onClick={handleResetSearch}>重置</Button>
+                </div>
+                <div>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateDesign}>
+                    新建结构设计
+                  </Button>
+                </div>
               </div>
               
               {/* 结构设计列表 */}
               <Table 
                 columns={columns} 
-                dataSource={schemaDesigns} 
+                dataSource={filteredSchemaDesigns.sort((a, b) => b.id - a.id)} // 按ID倒序排列
                 rowKey="id"
                 pagination={{ pageSize: 10 }}
                 scroll={{ x: 'max-content' }}
@@ -1590,15 +1911,116 @@ const SchemaDesign = () => {
               closable
             >
               <div style={{ padding: '24px' }}>
-                <Steps current={currentStep}>
-                  <Step title="创建工单" description="填写工单基本信息" />
-                  <Step title="结构设计" description="设计表结构" />
-                  <Step title="流程发布" description="发布变更流程" />
-                  <Step title="工单结束" description="完成工单" />
-                </Steps>
+            
+                {/* 强制显示步骤条内容，不依赖于Steps组件 */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', padding: '20px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                  <div 
+                    style={{ 
+                      textAlign: 'center', 
+                      flex: 1, 
+                      padding: '10px', 
+                      backgroundColor: currentStep === 0 ? '#1890ff' : '#e8e8e8', 
+                      color: currentStep === 0 ? '#fff' : '#000', 
+                      borderRadius: '4px', 
+                      marginRight: '5px',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => {
+                      // 检查URL中是否有workOrderId参数
+                      const params = new URLSearchParams(location.search);
+                      const workOrderId = params.get('workOrderId');
+                      
+                      if (workOrderId && currentStep > 0) {
+                        // 如果是从编辑状态返回到步骤0，需要重新加载工单数据
+                        const foundWorkOrder = schemaDesigns.find(item => item.id == workOrderId);
+                        if (foundWorkOrder) {
+                          setWorkOrder(foundWorkOrder);
+                          designForm.setFieldsValue({
+                            projectName: foundWorkOrder.projectName || '',
+                            databaseType: foundWorkOrder.databaseType || 'MySQL',
+                            changeBaseline: foundWorkOrder.changeBaseline || undefined,
+                            projectBackground: foundWorkOrder.projectBackground || '',
+                            relatedPerson: foundWorkOrder.relatedPerson || ''
+                          });
+                        }
+                      }
+                      setCurrentStep(0);
+                      // 注意：不清除URL参数，保留用于后续操作
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold' }}>1. 创建工单</div>
+                    <div style={{ fontSize: '12px' }}>填写工单基本信息</div>
+                  </div>
+                  <div 
+                    style={{ 
+                      textAlign: 'center', 
+                      flex: 1, 
+                      padding: '10px', 
+                      backgroundColor: currentStep === 1 ? '#1890ff' : '#e8e8e8', 
+                      color: currentStep === 1 ? '#fff' : '#000', 
+                      borderRadius: '4px', 
+                      marginRight: '5px',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => {
+                      // 检查URL中是否有workOrderId参数
+                      const params = new URLSearchParams(location.search);
+                      const workOrderId = params.get('workOrderId');
+                      
+                      if (workOrderId && currentStep !== 1) {
+                        // 如果是从其他步骤切换到步骤1，需要加载表结构数据
+                        fetchTableStructureDesigns(workOrderId);
+                      }
+                      setCurrentStep(1);
+                      // 注意：不清除URL参数，保留用于后续操作
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold' }}>2. 结构设计</div>
+                    <div style={{ fontSize: '12px' }}>设计表结构</div>
+                  </div>
+                  <div 
+                    style={{ 
+                      textAlign: 'center', 
+                      flex: 1, 
+                      padding: '10px', 
+                      backgroundColor: currentStep === 2 ? '#1890ff' : '#e8e8e8', 
+                      color: currentStep === 2 ? '#fff' : '#000', 
+                      borderRadius: '4px', 
+                      marginRight: '5px',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => {
+                      setCurrentStep(2);
+                      // 注意：不清除URL参数，保留用于后续操作
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold' }}>3. 流程发布</div>
+                    <div style={{ fontSize: '12px' }}>发布变更流程</div>
+                  </div>
+                  <div 
+                    style={{ 
+                      textAlign: 'center', 
+                      flex: 1, 
+                      padding: '10px', 
+                      backgroundColor: currentStep === 3 ? '#1890ff' : '#e8e8e8', 
+                      color: currentStep === 3 ? '#fff' : '#000', 
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => {
+                      setCurrentStep(3);
+                      // 注意：不清除URL参数，保留用于后续操作
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold' }}>4. 工单结束</div>
+                    <div style={{ fontSize: '12px' }}>完成工单</div>
+                  </div>
+                </div>
                 
-                {currentStep === 1 && renderNewTableTab()}
-                {currentStep !== 1 && renderStepContent()}
+                <Card bodyStyle={{ padding: 0 }}>
+                  {currentStep === 1 && renderNewTableTab()}
+                  {currentStep !== 1 && renderStepContent()}
+                </Card>
               </div>
             </TabPane>
           )}
@@ -1676,6 +2098,51 @@ const SchemaDesign = () => {
               <Option value="orders">orders</Option>
               <Option value="products">products</Option>
             </Select>
+          </Form.Item>
+        </Form>
+      </Modal>
+      
+      {/* 执行变更到基准库弹窗 */}
+      <Modal
+        title="执行变更到基准库"
+        open={isExecuteModalVisible}
+        onOk={handleExecuteModalOk}
+        onCancel={handleExecuteModalCancel}
+        width={800}
+      >
+        <Form form={executeForm} layout="vertical">
+          <Form.Item
+            name="targetDatabase"
+            label="目标基准库"
+            initialValue={workOrder?.changeBaseline || ''}
+          >
+            <Input 
+              placeholder="目标基准库" 
+              disabled 
+            />
+          </Form.Item>
+          
+          <Form.Item
+            name="executeTime"
+            label="执行时间"
+            initialValue="立即执行"
+          >
+            <Radio.Group defaultValue="立即执行" disabled>
+              <Radio value="立即执行">立即执行</Radio>
+              <Radio value="定时执行" disabled>定时执行</Radio>
+            </Radio.Group>
+          </Form.Item>
+          
+          <Form.Item
+            name="targetScript"
+            label="目标脚本"
+            initialValue={generateDDLSql()}
+          >
+            <Input.TextArea 
+              placeholder="由工单的所有表信息生成的DDL语句" 
+              rows={10} 
+              disabled 
+            />
           </Form.Item>
         </Form>
       </Modal>

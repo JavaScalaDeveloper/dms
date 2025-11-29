@@ -10,7 +10,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/mysql/instances")
@@ -24,9 +23,7 @@ public class MysqlInstanceController {
      */
     @PostMapping("/list")
     public ApiResponse<List<MysqlInstanceDTO>> getAllInstances() {
-        List<MysqlInstanceDTO> instances = mysqlInstanceService.list().stream()
-                .map(DTOUtil::toDTO)
-                .collect(Collectors.toList());
+        List<MysqlInstanceDTO> instances = mysqlInstanceService.getAllInstanceDTOs();
         return ApiResponse.success(instances);
     }
     
@@ -35,8 +32,8 @@ public class MysqlInstanceController {
      */
     @PostMapping("/get")
     public ApiResponse<MysqlInstanceDTO> getInstanceById(@RequestBody IdRequestDTO request) {
-        MysqlInstance instance = mysqlInstanceService.getById(request.getId());
-        return ApiResponse.success(DTOUtil.toDTO(instance));
+        MysqlInstanceDTO instance = mysqlInstanceService.getInstanceDTOById(request.getId());
+        return ApiResponse.success(instance);
     }
     
     /**
@@ -46,7 +43,7 @@ public class MysqlInstanceController {
     public ApiResponse<MysqlInstanceDTO> createInstance(@RequestBody MysqlInstanceDTO instanceDTO) {
         MysqlInstance instance = DTOUtil.toEntity(instanceDTO);
         mysqlInstanceService.save(instance);
-        return ApiResponse.success("创建成功", DTOUtil.toDTO(instance));
+        return ApiResponse.success("创建成功", mysqlInstanceService.getInstanceDTOById(instance.getId()));
     }
     
     /**
@@ -56,7 +53,7 @@ public class MysqlInstanceController {
     public ApiResponse<MysqlInstanceDTO> updateInstance(@RequestBody MysqlInstanceDTO instanceDTO) {
         MysqlInstance instance = DTOUtil.toEntity(instanceDTO);
         mysqlInstanceService.updateById(instance);
-        return ApiResponse.success("更新成功", DTOUtil.toDTO(mysqlInstanceService.getById(instance.getId())));
+        return ApiResponse.success("更新成功", mysqlInstanceService.getInstanceDTOById(instance.getId()));
     }
     
     /**
