@@ -29,6 +29,9 @@ public class DTOUtil {
         dto.setPort(entity.getPort());
         dto.setStatus(entity.getStatus());
         dto.setEnv(entity.getEnv());
+        dto.setRelatedTestInstance(entity.getRelatedTestInstanceHost());
+        dto.setRelatedPreInstance(entity.getRelatedPreInstanceHost());
+        dto.setRelatedPrdInstance(entity.getRelatedPrdInstanceHost());
         return dto;
     }
     
@@ -47,6 +50,9 @@ public class DTOUtil {
         entity.setPort(dto.getPort());
         entity.setStatus(dto.getStatus());
         entity.setEnv(dto.getEnv());
+        entity.setRelatedTestInstanceHost(dto.getRelatedTestInstance());
+        entity.setRelatedPreInstanceHost(dto.getRelatedPreInstance());
+        entity.setRelatedPrdInstanceHost(dto.getRelatedPrdInstance());
         return entity;
     }
     

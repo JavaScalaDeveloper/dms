@@ -19,6 +19,7 @@ import {
   DatabaseOutlined,
   TableOutlined
 } from '@ant-design/icons';
+import SearchForm from '../../components/SearchForm';
 
 const TsdbManagement = () => {
   const [activeTab, setActiveTab] = useState('instances');
@@ -43,6 +44,34 @@ const TsdbManagement = () => {
     { id: 1, name: 'cpu_metrics', database: 'metrics_db', rows: 1000000, size: '20GB' },
     { id: 2, name: 'memory_metrics', database: 'metrics_db', rows: 500000, size: '10GB' }
   ]);
+
+  // 查询条件
+  const [searchParams, setSearchParams] = useState({});
+
+  // 过滤数据的方法
+  const filterData = (data, params) => {
+    return data.filter(item => {
+      return Object.keys(params).every(key => {
+        if (!params[key]) return true;
+        return String(item[key]).toLowerCase().includes(String(params[key]).toLowerCase());
+      });
+    });
+  };
+
+  // 获取过滤后的实例数据
+  const getFilteredInstances = () => {
+    return filterData(instances, searchParams);
+  };
+
+  // 获取过滤后的数据库数据
+  const getFilteredDatabases = () => {
+    return filterData(databases, searchParams);
+  };
+
+  // 获取过滤后的表数据
+  const getFilteredTables = () => {
+    return filterData(tables, searchParams);
+  };
 
   const instanceColumns = [
     {
@@ -247,6 +276,16 @@ const TsdbManagement = () => {
     }
   };
 
+  // 处理查询
+  const handleSearch = (params = {}) => {
+    setSearchParams(params);
+  };
+
+  // 重置查询
+  const handleResetSearch = () => {
+    setSearchParams({});
+  };
+
   const handleOk = () => {
     form.validateFields().then(values => {
       if (editingRecord) {
@@ -297,6 +336,31 @@ const TsdbManagement = () => {
     setIsModalVisible(false);
   };
 
+  // 定义各tab的查询字段
+  const getInstanceSearchFields = () => [
+    { name: 'name', label: '实例名称', placeholder: '请输入实例名称' },
+    { name: 'host', label: '主机地址', placeholder: '请输入主机地址' },
+    { 
+      name: 'status', 
+      label: '状态', 
+      type: 'select', 
+      options: [
+        { value: 'running', label: '运行中' },
+        { value: 'stopped', label: '已停止' }
+      ]
+    }
+  ];
+
+  const getDatabaseSearchFields = () => [
+    { name: 'name', label: '数据库名称', placeholder: '请输入数据库名称' },
+    { name: 'instance', label: '所属实例', placeholder: '请输入所属实例' }
+  ];
+
+  const getTableSearchFields = () => [
+    { name: 'name', label: '表名称', placeholder: '请输入表名称' },
+    { name: 'database', label: '所属数据库', placeholder: '请输入所属数据库' }
+  ];
+
   return (
     <div>
       <div style={{ marginBottom: '24px' }}>
@@ -316,6 +380,15 @@ const TsdbManagement = () => {
             key="instances"
           >
             <div style={{ padding: '24px' }}>
+              {/* 查询区域 */}
+              <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#fafafa', borderRadius: '4px' }}>
+                <SearchForm 
+                  fields={getInstanceSearchFields()} 
+                  onSearch={handleSearch} 
+                  onReset={handleResetSearch}
+                />
+              </div>
+              
               <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
                   新增实例
@@ -324,7 +397,7 @@ const TsdbManagement = () => {
               
               <Table 
                 columns={instanceColumns} 
-                dataSource={instances} 
+                dataSource={getFilteredInstances()} 
                 rowKey="id"
                 pagination={{ pageSize: 10 }}
                 scroll={{ x: 'max-content' }}
@@ -342,6 +415,15 @@ const TsdbManagement = () => {
             key="databases"
           >
             <div style={{ padding: '24px' }}>
+              {/* 查询区域 */}
+              <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#fafafa', borderRadius: '4px' }}>
+                <SearchForm 
+                  fields={getDatabaseSearchFields()} 
+                  onSearch={handleSearch} 
+                  onReset={handleResetSearch}
+                />
+              </div>
+              
               <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
                   新增数据库
@@ -350,7 +432,7 @@ const TsdbManagement = () => {
               
               <Table 
                 columns={databaseColumns} 
-                dataSource={databases} 
+                dataSource={getFilteredDatabases()} 
                 rowKey="id"
                 pagination={{ pageSize: 10 }}
                 scroll={{ x: 'max-content' }}
@@ -368,6 +450,15 @@ const TsdbManagement = () => {
             key="tables"
           >
             <div style={{ padding: '24px' }}>
+              {/* 查询区域 */}
+              <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#fafafa', borderRadius: '4px' }}>
+                <SearchForm 
+                  fields={getTableSearchFields()} 
+                  onSearch={handleSearch} 
+                  onReset={handleResetSearch}
+                />
+              </div>
+              
               <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
                   新增表
@@ -376,7 +467,7 @@ const TsdbManagement = () => {
               
               <Table 
                 columns={tableColumns} 
-                dataSource={tables} 
+                dataSource={getFilteredTables()} 
                 rowKey="id"
                 pagination={{ pageSize: 10 }}
                 scroll={{ x: 'max-content' }}
@@ -393,7 +484,7 @@ const TsdbManagement = () => {
         onCancel={handleCancel}
         width={600}
       >
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="horizontal" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }}>
           {activeTab === 'instances' && (
             <>
               <Form.Item

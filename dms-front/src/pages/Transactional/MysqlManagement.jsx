@@ -21,6 +21,7 @@ import {
   TableOutlined
 } from '@ant-design/icons';
 import { mysqlInstanceApi, mysqlDatabaseApi, mysqlTableApi } from '../../services/mysqlApi';
+import SearchForm from '../../components/SearchForm';
 
 const { Option } = Select;
 
@@ -42,11 +43,14 @@ const MysqlManagement = () => {
   const [tables, setTables] = useState([]);
   const [loadingTables, setLoadingTables] = useState(false);
 
+  // 查询条件
+  const [searchParams, setSearchParams] = useState({});
+
   // 获取实例数据
-  const fetchInstances = async () => {
+  const fetchInstances = async (params = {}) => {
     setLoadingInstances(true);
     try {
-      const response = await mysqlInstanceApi.getInstances();
+      const response = await mysqlInstanceApi.getInstances(params);
       setInstances(response.data || []);
     } catch (error) {
       message.error('获取实例数据失败: ' + error.message);
@@ -56,10 +60,10 @@ const MysqlManagement = () => {
   };
 
   // 获取数据库数据
-  const fetchDatabases = async () => {
+  const fetchDatabases = async (params = {}) => {
     setLoadingDatabases(true);
     try {
-      const response = await mysqlDatabaseApi.getDatabases();
+      const response = await mysqlDatabaseApi.getDatabases(params);
       setDatabases(response.data || []);
     } catch (error) {
       message.error('获取数据库数据失败: ' + error.message);
@@ -69,10 +73,10 @@ const MysqlManagement = () => {
   };
 
   // 获取表数据
-  const fetchTables = async () => {
+  const fetchTables = async (params = {}) => {
     setLoadingTables(true);
     try {
-      const response = await mysqlTableApi.getTables();
+      const response = await mysqlTableApi.getTables(params);
       setTables(response.data || []);
     } catch (error) {
       message.error('获取表数据失败: ' + error.message);
@@ -83,27 +87,61 @@ const MysqlManagement = () => {
 
   // 组件加载时获取数据
   useEffect(() => {
-    fetchInstances();
-    fetchDatabases();
-    fetchTables();
+    handleSearch();
   }, []);
+
+  // 监听环境字段变化，确保关联实例选择框正确显示/隐藏
+  useEffect(() => {
+    const currentEnv = form.getFieldValue('env');
+    // 如果当前环境不是dev，则清空关联实例的值
+    if (currentEnv !== 'dev') {
+      form.setFieldsValue({
+        relatedTestInstance: undefined,
+        relatedPreInstance: undefined,
+        relatedPrdInstance: undefined
+      });
+    }
+  }, [form.getFieldValue('env')]);
 
   // 切换标签页时刷新数据
   useEffect(() => {
     switch (activeTab) {
       case 'instances':
-        fetchInstances();
+        fetchInstances(searchParams);
         break;
       case 'databases':
-        fetchDatabases();
+        fetchDatabases(searchParams);
         break;
       case 'tables':
-        fetchTables();
+        fetchTables(searchParams);
         break;
       default:
         break;
     }
   }, [activeTab]);
+
+  // 处理查询
+  const handleSearch = (params = {}) => {
+    setSearchParams(params);
+    switch (activeTab) {
+      case 'instances':
+        fetchInstances(params);
+        break;
+      case 'databases':
+        fetchDatabases(params);
+        break;
+      case 'tables':
+        fetchTables(params);
+        break;
+      default:
+        break;
+    }
+  };
+
+  // 重置查询
+  const handleResetSearch = () => {
+    handleSearch({});
+  };
 
   const instanceColumns = [
     {
@@ -135,6 +173,22 @@ const MysqlManagement = () => {
       title: '环境',
       dataIndex: 'env',
       key: 'env',
+      render: (env) => {
+        const envMap = {
+          'prd': { text: '生产环境', color: 'red' },
+          'pre': { text: '预发布环境', color: 'red' },
+          'test': { text: '测试环境', color: 'blue' },
+          'dev': { text: '开发环境', color: 'blue' }
+        };
+        
+        const envInfo = envMap[env] || { text: env || '未知环境', color: 'default' };
+        
+        return (
+          <span style={{ color: envInfo.color }}>
+            {envInfo.text}
+          </span>
+        );
+      }
     },
     {
       title: '创建时间',
@@ -334,6 +388,26 @@ const MysqlManagement = () => {
     const formData = { ...record };
     delete formData.createTime;
     delete formData.modifyTime;
+    
+    // 确保环境字段正确设置
+    if (!formData.env) {
+      formData.env = 'dev'; // 默认值
+    }
+    
+    // 确保关联实例字段正确设置
+    if (formData.env === 'dev') {
+      // 如果环境是开发环境，确保关联实例字段存在
+      if (formData.relatedTestInstance === undefined) {
+        formData.relatedTestInstance = null;
+      }
+      if (formData.relatedPreInstance === undefined) {
+        formData.relatedPreInstance = null;
+      }
+      if (formData.relatedPrdInstance === undefined) {
+        formData.relatedPrdInstance = null;
+      }
+    }
+    
     form.setFieldsValue(formData);
     setIsModalVisible(true);
   };
@@ -344,17 +418,17 @@ const MysqlManagement = () => {
         case 'instance':
           await mysqlInstanceApi.deleteInstance(id);
           message.success('实例删除成功');
-          fetchInstances();
+          fetchInstances(searchParams);
           break;
         case 'database':
           await mysqlDatabaseApi.deleteDatabase(id);
           message.success('数据库删除成功');
-          fetchDatabases();
+          fetchDatabases(searchParams);
           break;
         case 'table':
           await mysqlTableApi.deleteTable(id);
           message.success('表删除成功');
-          fetchTables();
+          fetchTables(searchParams);
           break;
         default:
           break;
@@ -368,23 +442,31 @@ const MysqlManagement = () => {
     try {
       const values = await form.validateFields();
       
+      // 如果是开发环境，确保关联实例信息也被保存
+      if (values.env === 'dev') {
+        // 关联实例信息已在values中，直接保存即可
+      }
+      
       if (editingRecord) {
         // 编辑操作
         switch (editingRecord.type) {
           case 'instance':
-            await mysqlInstanceApi.updateInstance(editingRecord.id, values);
+            // 修复：将ID合并到values对象中，而不是作为单独的参数传递
+            await mysqlInstanceApi.updateInstance({...values, id: editingRecord.id});
             message.success('实例更新成功');
-            fetchInstances();
+            fetchInstances(searchParams);
             break;
           case 'database':
-            await mysqlDatabaseApi.updateDatabase(editingRecord.id, values);
+            // 修复：将ID合并到values对象中，而不是作为单独的参数传递
+            await mysqlDatabaseApi.updateDatabase({...values, id: editingRecord.id});
             message.success('数据库更新成功');
-            fetchDatabases();
+            fetchDatabases(searchParams);
             break;
           case 'table':
-            await mysqlTableApi.updateTable(editingRecord.id, values);
+            // 修复：将ID合并到values对象中，而不是作为单独的参数传递
+            await mysqlTableApi.updateTable({...values, id: editingRecord.id});
             message.success('表更新成功');
-            fetchTables();
+            fetchTables(searchParams);
             break;
           default:
             break;
@@ -395,17 +477,17 @@ const MysqlManagement = () => {
           case 'instances':
             await mysqlInstanceApi.createInstance(values);
             message.success('实例添加成功');
-            fetchInstances();
+            fetchInstances(searchParams);
             break;
           case 'databases':
             await mysqlDatabaseApi.createDatabase(values);
             message.success('数据库添加成功');
-            fetchDatabases();
+            fetchDatabases(searchParams);
             break;
           case 'tables':
             await mysqlTableApi.createTable(values);
             message.success('表添加成功');
-            fetchTables();
+            fetchTables(searchParams);
             break;
           default:
             break;
@@ -420,6 +502,42 @@ const MysqlManagement = () => {
   const handleCancel = () => {
     setIsModalVisible(false);
   };
+
+  // 定义各tab的查询字段
+  const getInstanceSearchFields = () => [
+    { name: 'name', label: '实例名称', placeholder: '请输入实例名称' },
+    { name: 'host', label: '主机地址', placeholder: '请输入主机地址' },
+    { 
+      name: 'status', 
+      label: '状态', 
+      type: 'select', 
+      options: [
+        { value: 'running', label: '运行中' },
+        { value: 'stopped', label: '已停止' }
+      ]
+    },
+    { 
+      name: 'env', 
+      label: '环境', 
+      type: 'select', 
+      options: [
+        { value: 'prd', label: '生产环境' },
+        { value: 'pre', label: '预发布环境' },
+        { value: 'test', label: '测试环境' },
+        { value: 'dev', label: '开发环境' }
+      ]
+    }
+  ];
+
+  const getDatabaseSearchFields = () => [
+    { name: 'name', label: '数据库名称', placeholder: '请输入数据库名称' },
+    { name: 'instanceHost', label: '所属实例', placeholder: '请输入所属实例' }
+  ];
+
+  const getTableSearchFields = () => [
+    { name: 'name', label: '表名称', placeholder: '请输入表名称' },
+    { name: 'dbName', label: '所属数据库', placeholder: '请输入所属数据库' }
+  ];
 
   return (
     <div>
@@ -440,6 +558,16 @@ const MysqlManagement = () => {
             key="instances"
           >
             <div style={{ padding: '24px' }}>
+              {/* 查询区域 */}
+              <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#fafafa', borderRadius: '4px' }}>
+                <SearchForm 
+                  fields={getInstanceSearchFields()} 
+                  onSearch={handleSearch} 
+                  onReset={handleResetSearch}
+                  loading={loadingInstances}
+                />
+              </div>
+              
               <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
                   新增实例
@@ -467,6 +595,16 @@ const MysqlManagement = () => {
             key="databases"
           >
             <div style={{ padding: '24px' }}>
+              {/* 查询区域 */}
+              <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#fafafa', borderRadius: '4px' }}>
+                <SearchForm 
+                  fields={getDatabaseSearchFields()} 
+                  onSearch={handleSearch} 
+                  onReset={handleResetSearch}
+                  loading={loadingDatabases}
+                />
+              </div>
+              
               <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
                   新增数据库
@@ -494,6 +632,16 @@ const MysqlManagement = () => {
             key="tables"
           >
             <div style={{ padding: '24px' }}>
+              {/* 查询区域 */}
+              <div style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#fafafa', borderRadius: '4px' }}>
+                <SearchForm 
+                  fields={getTableSearchFields()} 
+                  onSearch={handleSearch} 
+                  onReset={handleResetSearch}
+                  loading={loadingTables}
+                />
+              </div>
+              
               <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
                   新增表
@@ -520,7 +668,7 @@ const MysqlManagement = () => {
         onCancel={handleCancel}
         width={600}
       >
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="horizontal" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }}>
           {activeTab === 'instances' && (
             <>
               <Form.Item
@@ -536,7 +684,7 @@ const MysqlManagement = () => {
                 label="主机地址"
                 rules={[{ required: true, message: '请输入主机地址' }]}
               >
-                <Input placeholder="请输入主机地址" />
+                <Input placeholder="请输入主机地址" disabled={!!editingRecord} />
               </Form.Item>
               
               <Form.Item
@@ -562,13 +710,98 @@ const MysqlManagement = () => {
                 name="env"
                 label="环境"
               >
-                <Select placeholder="请选择环境">
+                <Select 
+                  placeholder="请选择环境"
+                  onChange={(value) => {
+                    // 当环境改变时，清空关联实例的值
+                    if (value !== 'dev') {
+                      form.setFieldsValue({
+                        relatedTestInstance: undefined,
+                        relatedPreInstance: undefined,
+                        relatedPrdInstance: undefined
+                      });
+                    }
+                    // 触发表单重新渲染以正确显示/隐藏关联实例选择框
+                    form.setFieldsValue({ env: value });
+                  }}
+                >
                   <Option value="prd">生产环境</Option>
                   <Option value="pre">预发布环境</Option>
                   <Option value="test">测试环境</Option>
                   <Option value="dev">开发环境</Option>
                 </Select>
               </Form.Item>
+              
+              {/* 关联实例选择框 - 仅在开发环境时显示 */}
+              {form.getFieldValue('env') === 'dev' && (
+                <>
+                  <Form.Item
+                    name="relatedTestInstance"
+                    label="关联测试实例"
+                  >
+                    <Select 
+                      showSearch
+                      placeholder="请选择关联的测试实例"
+                      optionFilterProp="children"
+                      filterOption={(input, option) =>
+                        option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                      }
+                    >
+                      {instances
+                        .filter(instance => instance.env === 'test')
+                        .map(instance => (
+                          <Option key={instance.host} value={instance.host}>
+                            {instance.name} ({instance.host}:{instance.port})
+                          </Option>
+                        ))}
+                    </Select>
+                  </Form.Item>
+                  
+                  <Form.Item
+                    name="relatedPreInstance"
+                    label="关联预发实例"
+                  >
+                    <Select 
+                      showSearch
+                      placeholder="请选择关联的预发实例"
+                      optionFilterProp="children"
+                      filterOption={(input, option) =>
+                        option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                      }
+                    >
+                      {instances
+                        .filter(instance => instance.env === 'pre')
+                        .map(instance => (
+                          <Option key={instance.host} value={instance.host}>
+                            {instance.name} ({instance.host}:{instance.port})
+                          </Option>
+                        ))}
+                    </Select>
+                  </Form.Item>
+                  
+                  <Form.Item
+                    name="relatedPrdInstance"
+                    label="关联生产实例"
+                  >
+                    <Select 
+                      showSearch
+                      placeholder="请选择关联的生产实例"
+                      optionFilterProp="children"
+                      filterOption={(input, option) =>
+                        option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                      }
+                    >
+                      {instances
+                        .filter(instance => instance.env === 'prd')
+                        .map(instance => (
+                          <Option key={instance.host} value={instance.host}>
+                            {instance.name} ({instance.host}:{instance.port})
+                          </Option>
+                        ))}
+                    </Select>
+                  </Form.Item>
+                </>
+              )}
               
               <Form.Item
                 name="creator"

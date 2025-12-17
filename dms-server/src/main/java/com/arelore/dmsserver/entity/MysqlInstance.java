@@ -31,6 +31,21 @@ public class MysqlInstance extends BaseEntity {
      */
     private String env;
 
+    /**
+     * 关联测试实例host
+     */
+    private String relatedTestInstanceHost;
+
+    /**
+     * 关联预发实例host
+     */
+    private String relatedPreInstanceHost;
+
+    /**
+     * 关联生产实例host
+     */
+    private String relatedPrdInstanceHost;
+
     public String getName() {
         return name;
     }
@@ -69,5 +84,29 @@ public class MysqlInstance extends BaseEntity {
 
     public void setEnv(String env) {
         this.env = env;
+    }
+
+    public String getRelatedTestInstanceHost() {
+        return relatedTestInstanceHost;
+    }
+
+    public void setRelatedTestInstanceHost(String relatedTestInstanceHost) {
+        this.relatedTestInstanceHost = relatedTestInstanceHost;
+    }
+
+    public String getRelatedPreInstanceHost() {
+        return relatedPreInstanceHost;
+    }
+
+    public void setRelatedPreInstanceHost(String relatedPreInstanceHost) {
+        this.relatedPreInstanceHost = relatedPreInstanceHost;
+    }
+
+    public String getRelatedPrdInstanceHost() {
+        return relatedPrdInstanceHost;
+    }
+
+    public void setRelatedPrdInstanceHost(String relatedPrdInstanceHost) {
+        this.relatedPrdInstanceHost = relatedPrdInstanceHost;
     }
 }

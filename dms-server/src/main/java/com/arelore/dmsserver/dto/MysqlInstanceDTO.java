@@ -29,6 +29,21 @@ public class MysqlInstanceDTO extends BaseDTO {
      */
     private String env;
 
+    /**
+     * 关联测试实例host
+     */
+    private String relatedTestInstance;
+
+    /**
+     * 关联预发实例host
+     */
+    private String relatedPreInstance;
+
+    /**
+     * 关联生产实例host
+     */
+    private String relatedPrdInstance;
+
     public String getName() {
         return name;
     }
@@ -67,5 +82,29 @@ public class MysqlInstanceDTO extends BaseDTO {
 
     public void setEnv(String env) {
         this.env = env;
+    }
+
+    public String getRelatedTestInstance() {
+        return relatedTestInstance;
+    }
+
+    public void setRelatedTestInstance(String relatedTestInstance) {
+        this.relatedTestInstance = relatedTestInstance;
+    }
+
+    public String getRelatedPreInstance() {
+        return relatedPreInstance;
+    }
+
+    public void setRelatedPreInstance(String relatedPreInstance) {
+        this.relatedPreInstance = relatedPreInstance;
+    }
+
+    public String getRelatedPrdInstance() {
+        return relatedPrdInstance;
+    }
+
+    public void setRelatedPrdInstance(String relatedPrdInstance) {
+        this.relatedPrdInstance = relatedPrdInstance;
     }
 }

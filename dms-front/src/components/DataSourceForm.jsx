@@ -15,7 +15,7 @@ const getSubtypeLabel = (subtype) => {
 
 const DataSourceForm = ({ form, onTypeChange, dataSourceTypes }) => {
   return (
-    <Form form={form} layout="vertical">
+    <Form form={form} layout="horizontal" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }}>
       <Form.Item
         name="name"
         label="数据源名称"
