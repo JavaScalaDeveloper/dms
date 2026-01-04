@@ -72,10 +72,17 @@ const SchemaDesign = () => {
   const [isExecuteModalVisible, setIsExecuteModalVisible] = useState(false);
   const [executeForm] = Form.useForm();
   
-  // 添加查询相关的状态
-  const [searchTitle, setSearchTitle] = useState('');
-  const [filteredSchemaDesigns, setFilteredSchemaDesigns] = useState([]);
+  // 添加关联实例状态
+  const [relatedInstances, setRelatedInstances] = useState({
+    dev: '',
+    test: '',
+    pre: '',
+    prd: ''
+  });
   
+  // 添加查询相关的状态  const [searchTitle, setSearchTitle] = useState('');
+  const [searchTitle, setSearchTitle] = useState('');
+    const [filteredSchemaDesigns, setFilteredSchemaDesigns] = useState([]);
   // React Router Hooks
   const location = useLocation();
   const history = useNavigate();
@@ -606,10 +613,24 @@ const SchemaDesign = () => {
 
   // 处理进入下一节点按钮点击
   const handleNextNode = () => {
-    // 这里可以添加进入下一节点的逻辑
-    message.info('进入下一节点功能待实现');
+    // 跳转到流程发布步骤（步骤2）
+    setCurrentStep(2);
+    
+    // 获取当前工单的关联实例信息
+    // 这里模拟获取关联实例信息的逻辑
+    // 在实际应用中，您需要从后端API获取这些信息
+    const relatedInstances = {
+      dev: workOrder?.changeBaseline || '开发实例',
+      test: workOrder?.relatedTestInstance || '测试实例',
+      pre: workOrder?.relatedPreInstance || '预发实例',
+      prd: workOrder?.relatedPrdInstance || '生产实例'
+    };
+    
+    // 设置关联实例信息到状态中
+    setRelatedInstances(relatedInstances);
+    
+    message.success('已进入流程发布节点');
   };
-
   // 处理执行变更弹窗的确认操作
   const handleExecuteModalOk = () => {
     executeForm.validateFields().then(values => {
@@ -1131,10 +1152,101 @@ const SchemaDesign = () => {
       case 2:
         return (
           <div style={{ padding: '24px' }}>
-            <div style={{ textAlign: 'center', padding: '48px 0' }}>
-              <Text type="secondary">流程发布中...</Text>
-            </div>
-            
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ marginBottom: '16px' }}>流程发布</h3>
+              
+              {/* 测试发布步骤条 */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                padding: '16px', 
+                border: '1px solid #d9d9d9', 
+                borderRadius: '4px', 
+                marginBottom: '16px',
+                backgroundColor: '#fafafa'
+              }}>
+                <div style={{ 
+                  width: '30px', 
+                  height: '30px', 
+                  borderRadius: '50%', 
+                  backgroundColor: '#1890ff', 
+                  color: 'white', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  marginRight: '16px'
+                }}>
+                  1
+                </div>
+                <div>
+                  <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>测试发布</div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>
+                    开发实例: {relatedInstances.dev || '未指定'} → 测试实例: {relatedInstances.test || '未指定'}
+                  </div>
+                </div>
+              </div>
+              
+              {/* 预发发布步骤条 */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                padding: '16px', 
+                border: '1px solid #d9d9d9', 
+                borderRadius: '4px', 
+                marginBottom: '16px',
+                backgroundColor: '#fafafa'
+              }}>
+                <div style={{ 
+                  width: '30px', 
+                  height: '30px', 
+                  borderRadius: '50%', 
+                  backgroundColor: '#1890ff', 
+                  color: 'white', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  marginRight: '16px'
+                }}>
+                  2
+                </div>
+                <div>
+                  <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>预发发布</div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>
+                    开发实例: {relatedInstances.dev || '未指定'} → 预发实例: {relatedInstances.pre || '未指定'}
+                  </div>
+                </div>
+              </div>
+              
+              {/* 生产发布步骤条 */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                padding: '16px', 
+                border: '1px solid #d9d9d9', 
+                borderRadius: '4px', 
+                backgroundColor: '#fafafa'
+              }}>
+                <div style={{ 
+                  width: '30px', 
+                  height: '30px', 
+                  borderRadius: '50%', 
+                  backgroundColor: '#1890ff', 
+                  color: 'white', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  marginRight: '16px'
+                }}>
+                  3
+                </div>
+                <div>
+                  <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>生产发布</div>
+                  <div style={{ fontSize: '12px', color: '#666' }}>
+                    开发实例: {relatedInstances.dev || '未指定'} → 生产实例: {relatedInstances.prd || '未指定'}
+                  </div>
+                </div>
+              </div>
+            </div>            
             <div style={{ textAlign: 'center', marginTop: 24 }}>
               <Space>
                 <Button onClick={handlePrevStep}>上一步</Button>
